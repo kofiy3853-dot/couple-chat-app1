@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx tsx src/server/websocket/server.ts & npm run start
+    startCommand: node start.js
     envVars:
       - key: NODE_ENV
         value: production
