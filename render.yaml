@@ -39,22 +39,13 @@ services:
           name: couple-chat-db
           property: connectionString
       - key: NEXTAUTH_SECRET
-        fromService:
-          name: couple-chat-web
-          type: web
-          property: NEXTAUTH_SECRET
+        generateValue: true
       - key: JWT_SECRET
-        fromService:
-          name: couple-chat-web
-          type: web
-          property: JWT_SECRET
+        generateValue: true
       - key: WS_PORT
         value: "3001"
       - key: NEXT_PUBLIC_APP_URL
-        fromService:
-          name: couple-chat-web
-          type: web
-          property: NEXT_PUBLIC_APP_URL
+        value: https://couple-chat-web.onrender.com
 
 databases:
   - name: couple-chat-db
