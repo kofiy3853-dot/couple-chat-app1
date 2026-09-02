@@ -20,6 +20,8 @@ services:
         value: https://couple-chat-web.onrender.com
       - key: JWT_SECRET
         generateValue: true
+      - key: AUTH_TRUST_HOST
+        value: "true"
 
 databases:
   - name: couple-chat-db
