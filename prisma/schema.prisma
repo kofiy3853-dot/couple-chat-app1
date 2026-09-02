@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String?
+  username      String?        @unique
+  email         String         @unique
+  emailVerified DateTime?
+  image         String?
+  bio           String?
+  password      String?
+  role          UserRole       @default(USER)
+  status        UserStatus     @default(ACTIVE)
+  lastSeenAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  accounts            Account[]
+  sessions            Session[]
+  coupleMembers       CoupleMember[]
+  sentMessages        Message[]
+  messageReactions    MessageReaction[]
+  notifications       Notification[]
+  memoriesCreated     Memory[]
+  timelineEventsCreated TimelineEvent[]
+  coupleInvitationsCreated CoupleInvitation[] @relation("Creator")
+  coupleInvitationsUsed   CoupleInvitation[] @relation("UserUsed")
+  reports              Report[]          @relation("Reporter")
+  reviewedReports      Report[]          @relation("Reviewer")
+  privacySetting       UserPrivacySetting?
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Couple ──────────────────────────────────────────────────────────────────
+
+model Couple {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members           CoupleMember[]
+  invitations       CoupleInvitation[]
+  conversation      Conversation?
+  memories          Memory[]
+  timelineEvents    TimelineEvent[]
+}
+
+model CoupleMember {
+  id       String   @id @default(uuid()) @db.Uuid
+  coupleId String   @db.Uuid
+  userId   String   @db.Uuid
+  joinedAt DateTime @default(now())
+
+  couple Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([coupleId, userId])
+  @@index([coupleId])
+  @@index([userId])
+}
+
+model CoupleInvitation {
+  id        String               @id @default(uuid()) @db.Uuid
+  code      String               @unique
+  creatorId String               @db.Uuid
+  coupleId  String               @db.Uuid
+  usedById  String?              @db.Uuid
+  expiresAt DateTime
+  createdAt DateTime             @default(now())
+
+  creator User    @relation("Creator", fields: [creatorId], references: [id], onDelete: Cascade)
+  couple  Couple  @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  usedBy  User?   @relation("UserUsed", fields: [usedById], references: [id], onDelete: SetNull)
+}
+
+// ─── Messaging ───────────────────────────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  coupleId  String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  couple   Couple    @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @db.Uuid
+  senderId       String      @db.Uuid
+  content        String      @db.Text
+  type           MessageType @default(TEXT)
+  deletedAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions    MessageReaction[]
+  attachments  Attachment[]
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String   @db.VarChar(10)
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model Attachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @db.Uuid
+  url       String
+  filename  String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+// ─── Memory & Timeline ───────────────────────────────────────────────────────
+
+model Memory {
+  id          String   @id @default(uuid()) @db.Uuid
+  coupleId    String   @db.Uuid
+  creatorId   String   @db.Uuid
+  title       String
+  description String?
+  imageUrl    String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  couple  Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  creator User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  coupleId    String   @db.Uuid
+  creatorId   String   @db.Uuid
+  title       String
+  description String?
+  date        DateTime @default(now())
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  couple  Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  creator User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+// ─── Moderation ──────────────────────────────────────────────────────────────
+
+model Report {
+  id           String         @id @default(uuid()) @db.Uuid
+  reporterId   String         @db.Uuid
+  targetType   ReportTarget
+  targetId     String         @db.Uuid
+  reason       ReportReason
+  description  String         @db.Text
+  status       ReportStatus   @default(PENDING)
+  adminNote    String?        @db.Text
+  reviewedById String?        @db.Uuid
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  reporter   User  @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("Reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([targetType])
+}
+
+// ─── Privacy ─────────────────────────────────────────────────────────────────
+
+model UserPrivacySetting {
+  id                     String  @id @default(uuid()) @db.Uuid
+  userId                 String  @unique @db.Uuid
+  showOnlineStatus       Boolean @default(true)
+  showLastSeen           Boolean @default(true)
+  readReceipts           Boolean @default(true)
+  messageNotifications   Boolean @default(true)
+  reactionNotifications  Boolean @default(true)
+  invitationNotifications Boolean @default(true)
+  memoryNotifications    Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+}
+
+enum NotificationType {
+  MESSAGE
+  INVITATION
+  REACTION
+  MEMORY
+  TIMELINE
+}
+
+enum ReportTarget {
+  USER
+  MESSAGE
+  IMAGE
+}
+
+enum ReportReason {
+  HARASSMENT
+  SPAM
+  INAPPROPRIATE_CONTENT
+  IMPERSONATION
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
