@@ -15,17 +15,14 @@ services:
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
-        sync: false
         value: https://couple-chat-web.onrender.com
       - key: NEXT_PUBLIC_APP_URL
-        sync: false
         value: https://couple-chat-web.onrender.com
       - key: JWT_SECRET
         generateValue: true
       - key: WS_PORT
         value: "3001"
       - key: NEXT_PUBLIC_WS_URL
-        sync: false
         value: wss://couple-chat-ws.onrender.com
 
   - type: worker
@@ -45,19 +42,19 @@ services:
         fromService:
           name: couple-chat-web
           type: web
-          envVar: NEXTAUTH_SECRET
+          property: NEXTAUTH_SECRET
       - key: JWT_SECRET
         fromService:
           name: couple-chat-web
           type: web
-          envVar: JWT_SECRET
+          property: JWT_SECRET
       - key: WS_PORT
         value: "3001"
       - key: NEXT_PUBLIC_APP_URL
         fromService:
           name: couple-chat-web
           type: web
-          envVar: NEXT_PUBLIC_APP_URL
+          property: NEXT_PUBLIC_APP_URL
 
 databases:
   - name: couple-chat-db
