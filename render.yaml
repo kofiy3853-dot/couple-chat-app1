@@ -9,7 +9,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: 
+        fromDatabase:
+          name: couple-chat-db
+          property: connectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
@@ -33,7 +35,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: 
+        fromDatabase:
+          name: couple-chat-db
+          property: connectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: JWT_SECRET
@@ -42,3 +46,8 @@ services:
         value: "3001"
       - key: NEXT_PUBLIC_APP_URL
         value: https://couple-chat-web.onrender.com
+
+databases:
+  - name: couple-chat-db
+    plan: free
+    databaseName: couple_chat
