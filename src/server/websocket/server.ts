@@ -8,7 +8,15 @@ import { db } from "@/lib/db";
 const PORT = parseInt(process.env.PORT || process.env.WS_PORT || "3001", 10);
 const REDIS_URL = process.env.REDIS_URL;
 
-const httpServer: HttpServer = new HttpServer();
+const httpServer: HttpServer = new HttpServer((req, res) => {
+  if (req.url === "/") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Couple Chat WebSocket Server is running.");
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
 
 const io = new Server(httpServer, {
   cors: {
