@@ -8,6 +8,7 @@ type EventCallback = (...args: any[]) => void;
 interface WebSocketClientOptions {
   url?: string;
   token?: string;
+  userId?: string;
 }
 
 class WebSocketClient {
@@ -18,13 +19,20 @@ class WebSocketClient {
   private maxReconnectAttempts = 10;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private url: string;
+  private userId: string;
   private _connected = false;
 
   constructor(options: WebSocketClientOptions = {}) {
     this.url = options.url || process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+    this.userId = options.userId || "";
   }
 
   static getInstance(options: WebSocketClientOptions = {}): WebSocketClient {
+    // If a userId is supplied and the singleton lacks one, destroy and recreate
+    if (WebSocketClient.instance && options.userId && WebSocketClient.instance.userId !== options.userId) {
+      WebSocketClient.instance.disconnect();
+      WebSocketClient.instance = null;
+    }
     if (!WebSocketClient.instance) {
       WebSocketClient.instance = new WebSocketClient(options);
     }
@@ -37,11 +45,16 @@ class WebSocketClient {
 
   connect(): void {
     if (this.socket?.connected) return;
+    if (!this.userId) {
+      console.warn("[WS Client] No userId provided, skipping connection");
+      return;
+    }
 
     this.socket = io(this.url, {
       transports: ["websocket", "polling"],
       reconnection: false,
       timeout: 10000,
+      auth: { userId: this.userId },
     });
 
     this.socket.on("connect", () => {

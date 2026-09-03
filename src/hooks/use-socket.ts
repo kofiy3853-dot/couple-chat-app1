@@ -5,7 +5,6 @@ import WebSocketClient from "@/server/websocket/client";
 import { useChatStore } from "@/stores/chat-store";
 
 interface UseSocketOptions {
-  token: string;
   conversationId: string | null;
   userId: string;
 }
@@ -16,7 +15,9 @@ export function useSocket({ token, conversationId, userId }: UseSocketOptions) {
   const { addMessage, removeMessage, setTypingUser, setOnlineUser } = useChatStore();
 
   useEffect(() => {
-    const client = WebSocketClient.getInstance({ token: "" });
+    if (!userId) return; // Don't connect if we don't have a user yet
+
+    const client = WebSocketClient.getInstance({ userId });
     clientRef.current = client;
 
     const unsubConnected = client.on("connected", () => setConnected(true));

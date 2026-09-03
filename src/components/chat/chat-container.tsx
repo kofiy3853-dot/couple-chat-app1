@@ -68,7 +68,6 @@ export function ChatContainer({ className }: ChatContainerProps) {
     startTyping,
     stopTyping,
   } = useSocket({
-    token: "", // Will be replaced by real auth token when implemented
     conversationId,
     userId: currentUser?.id || "",
   });
