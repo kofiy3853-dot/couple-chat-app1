@@ -288,6 +288,13 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     }
   });
 
+  // ─── Broadcast new message (after REST save) ────────────────────────────
+  socket.on("broadcast-new-message", (data: { conversationId: string; message: any }) => {
+    const { conversationId, message } = data;
+    if (!conversationId || !message) return;
+    socket.to(`conversation:${conversationId}`).emit("new-message", message);
+  });
+
   // ─── Message delivered ──────────────────────────────────────────────────
   socket.on("message-delivered", (data: { messageId: string; conversationId: string }) => {
     const { messageId, conversationId } = data;

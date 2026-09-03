@@ -43,7 +43,9 @@ export default async function DashboardLayout({
         </DashboardLayoutClient>
 
         <DashboardLayoutClient user={currentUser} mainOnly>
-          {children}
+          <div className="flex-1 overflow-hidden pb-16 lg:pb-0">
+            {children}
+          </div>
         </DashboardLayoutClient>
       </div>
 
