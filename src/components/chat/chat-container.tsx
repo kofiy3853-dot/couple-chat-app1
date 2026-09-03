@@ -65,6 +65,16 @@ export function ChatContainer({ className }: ChatContainerProps) {
     userId: currentUser?.id || "",
   });
 
+  const handleNewMessage = useCallback(
+    (message: unknown) => addRealtimeMessage(message as Parameters<typeof addRealtimeMessage>[0]),
+    [addRealtimeMessage]
+  );
+
+  const handleMarkMessageDeleted = useCallback(
+    (messageId: string) => markMessageDeleted(messageId),
+    [markMessageDeleted]
+  );
+
   const {
     connected,
     typingState,
@@ -75,8 +85,8 @@ export function ChatContainer({ className }: ChatContainerProps) {
   } = useSocket({
     conversationId,
     userId: currentUser?.id || "",
-    onNewMessage: addRealtimeMessage,
-    onMessageDeleted: markMessageDeleted,
+    onNewMessage: handleNewMessage,
+    onMessageDeleted: handleMarkMessageDeleted,
   });
 
   useEffect(() => {

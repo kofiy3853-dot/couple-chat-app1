@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest) {
     const user = await requireAuth();
     const body = await request.json();
 
-    const { privacy, profile, notifications } = body as {
+    const { privacy, profile, notifications, couple } = body as {
       privacy?: { showOnlineStatus?: boolean; showLastSeen?: boolean; readReceipts?: boolean };
       profile?: { name?: string; bio?: string; image?: string };
       notifications?: { messageNotifications?: boolean; reactionNotifications?: boolean; invitationNotifications?: boolean; memoryNotifications?: boolean };

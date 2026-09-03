@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     return <NoCoupleView userName={user.name?.split(" ")[0] || "there"} />;
   }
 
-  const [partnerMember, conversation, memories, notifications, messageCount] = await Promise.all([
+  const [partnerMember, conversation, memories, notifications] = await Promise.all([
     db.coupleMember.findFirst({
       where: { coupleId: couple.id, userId: { not: userId } },
       include: {
@@ -71,10 +71,11 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    conversation?.id
-      ? db.message.count({ where: { conversationId: conversation.id } })
-      : Promise.resolve(0),
   ]);
+
+  const messageCount = conversation?.id
+    ? await db.message.count({ where: { conversationId: conversation.id } })
+    : 0;
 
   const partner = partnerMember?.user;
   if (!partner) {
