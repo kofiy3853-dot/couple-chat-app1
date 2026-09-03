@@ -38,3 +38,45 @@ export async function DELETE(
     return errorResponse(error);
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ messageId: string }> }
+) {
+  try {
+    const user = await requireAuth();
+    const { messageId } = await params;
+    const body = await request.json();
+
+    const { content } = body;
+    if (!content || typeof content !== "string" || !content.trim()) {
+      throw new Error("Content is required and must be a non-empty string");
+    }
+
+    const message = await db.message.findUnique({
+      where: { id: messageId },
+      select: { id: true, senderId: true, deletedAt: true },
+    });
+
+    if (!message) {
+      throw new NotFoundError("Message not found");
+    }
+
+    if (message.senderId !== user.id) {
+      throw new ForbiddenError("You can only edit your own messages");
+    }
+
+    if (message.deletedAt) {
+      throw new Error("Cannot edit a deleted message");
+    }
+
+    const updatedMessage = await db.message.update({
+      where: { id: messageId },
+      data: { content: content.trim(), isEdited: true },
+    });
+
+    return successResponse(updatedMessage);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

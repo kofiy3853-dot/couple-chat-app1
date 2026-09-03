@@ -2,23 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import WebSocketClient from "@/server/websocket/client";
+import type { PresenceStatus } from "@/lib/constants";
 
 interface UseSocketOptions {
   conversationId: string | null;
   userId: string;
   onNewMessage?: (message: unknown) => void;
   onMessageDeleted?: (messageId: string) => void;
+  onMessageEdited?: (data: { messageId: string; content: string; editedBy: string }) => void;
 }
 
-export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
-  const [onlineState, setOnlineState] = useState<Record<string, boolean>>({});
+  const [presenceState, setPresenceState] = useState<Record<string, PresenceStatus>>({});
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const clientRef = useRef<WebSocketClient | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
   const onMessageDeletedRef = useRef(onMessageDeleted);
+  const onMessageEditedRef = useRef(onMessageEdited);
 
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
@@ -27,6 +30,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   useEffect(() => {
     onMessageDeletedRef.current = onMessageDeleted;
   }, [onMessageDeleted]);
+
+  useEffect(() => {
+    onMessageEditedRef.current = onMessageEdited;
+  }, [onMessageEdited]);
 
   useEffect(() => {
     conversationIdRef.current = conversationId;
@@ -48,17 +55,36 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     const unsubDisconnected = client.on("disconnected", () => setConnected(false));
 
     const unsubOnline = client.on("user-online", (data: { userId: string }) => {
-      setOnlineState((prev) => ({ ...prev, [data.userId]: true }));
+      setPresenceState((prev) => ({ ...prev, [data.userId]: prev[data.userId] === "offline" ? "online" : (prev[data.userId] ?? "online") }));
     });
 
     const unsubOffline = client.on("user-offline", (data: { userId: string }) => {
-      setOnlineState((prev) => ({ ...prev, [data.userId]: false }));
+      setPresenceState((prev) => ({ ...prev, [data.userId]: "offline" }));
+      setTypingState((prev) => ({ ...prev, [data.userId]: false }));
     });
 
-    const unsubSnapshot = client.on("online-users-snapshot", (data: { userIds: string[] }) => {
-      const snapshot: Record<string, boolean> = {};
-      data.userIds.forEach((id) => { snapshot[id] = true; });
-      setOnlineState(snapshot);
+    const unsubPresenceSnapshot = client.on("presence-snapshot", (data: Record<string, PresenceStatus>) => {
+      setPresenceState(data);
+    });
+
+    const unsubRecordingStart = client.on("recording-start", (data: { userId: string }) => {
+      if (data.userId === userId) return;
+      setPresenceState((prev) => ({ ...prev, [data.userId]: "recording" }));
+    });
+
+    const unsubRecordingStop = client.on("recording-stop", (data: { userId: string }) => {
+      if (data.userId === userId) return;
+      setPresenceState((prev) => ({ ...prev, [data.userId]: "online" }));
+    });
+
+    const unsubCallStart = client.on("call-start", (data: { userId: string }) => {
+      if (data.userId === userId) return;
+      setPresenceState((prev) => ({ ...prev, [data.userId]: "in-call" }));
+    });
+
+    const unsubCallEnd = client.on("call-end", (data: { userId: string }) => {
+      if (data.userId === userId) return;
+      setPresenceState((prev) => ({ ...prev, [data.userId]: "online" }));
     });
 
     const unsubTypingStart = client.on("typing-start", (data: { userId: string }) => {
@@ -84,6 +110,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onMessageDeletedRef.current?.(data.messageId);
     });
 
+    const unsubMessageEdited = client.on("message-edited", (data: { messageId: string; content: string; editedBy: string }) => {
+      onMessageEditedRef.current?.(data);
+    });
+
     client.connect();
 
     return () => {
@@ -91,11 +121,16 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       unsubDisconnected();
       unsubOnline();
       unsubOffline();
-      unsubSnapshot();
+      unsubPresenceSnapshot();
+      unsubRecordingStart();
+      unsubRecordingStop();
+      unsubCallStart();
+      unsubCallEnd();
       unsubTypingStart();
       unsubTypingStop();
       unsubNewMessage();
       unsubMessageDeleted();
+      unsubMessageEdited();
       Object.values(typingTimers.current).forEach(clearTimeout);
 
       if (conversationIdRef.current) {
@@ -165,16 +200,56 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
+  const startRecording = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.startRecording(conversationId);
+    },
+    []
+  );
+
+  const stopRecording = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.stopRecording(conversationId);
+    },
+    []
+  );
+
+  const startCall = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.startCall(conversationId);
+    },
+    []
+  );
+
+  const endCall = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.endCall(conversationId);
+    },
+    []
+  );
+
+  const editMessage = useCallback(
+    (messageId: string, conversationId: string, content: string) => {
+      clientRef.current?.editMessage(messageId, conversationId, content);
+    },
+    []
+  );
+
   return {
     connected,
     typingState,
-    onlineState,
+    presenceState,
     sendMessage,
     startTyping,
     stopTyping,
+    startRecording,
+    stopRecording,
+    startCall,
+    endCall,
     addReaction,
     removeReaction,
     deleteMessage,
+    editMessage,
     markAsRead,
   };
 }

@@ -20,6 +20,8 @@ interface MessageListProps {
   onDelete?: (messageId: string) => void;
   onReaction?: (messageId: string, emoji: string) => void;
   onMarkRead?: (lastMessageId: string) => void;
+  onReply?: (messageId: string) => void;
+  onEdit?: (messageId: string) => void;
 }
 
 function getDateLabel(dateString: string): string {
@@ -60,6 +62,8 @@ export function MessageList({
   onDelete,
   onReaction,
   onMarkRead,
+  onReply,
+  onEdit,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -191,6 +195,8 @@ export function MessageList({
                   isRead={isOwn && message.id === lastReadMessageId}
                   onDelete={onDelete}
                   onReaction={onReaction}
+                  onReply={onReply}
+                  onEdit={onEdit}
                 />
               );
             })}

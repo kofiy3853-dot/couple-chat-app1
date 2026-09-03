@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import type { PresenceStatus } from "./constants";
 
 const globalForRedis = globalThis as unknown as { redis: Redis };
 
@@ -67,6 +68,22 @@ export async function removeTyping(conversationId: string, userId: string): Prom
 
 export async function getTypingUsers(conversationId: string): Promise<string[]> {
   return redis.smembers(`typing:${conversationId}`);
+}
+
+const PRESENCE_PREFIX = "presence:";
+
+export async function setPresenceStatus(userId: string, status: PresenceStatus): Promise<void> {
+  await redis.set(`${PRESENCE_PREFIX}${userId}`, status, "EX", 300);
+}
+
+export async function getPresenceStatus(userId: string): Promise<PresenceStatus | null> {
+  const status = await redis.get(`${PRESENCE_PREFIX}${userId}`);
+  if (!status || !["online", "typing", "recording", "in-call"].includes(status)) return null;
+  return status as PresenceStatus;
+}
+
+export async function clearPresenceStatus(userId: string): Promise<void> {
+  await redis.del(`${PRESENCE_PREFIX}${userId}`);
 }
 
 export async function checkRateLimit(

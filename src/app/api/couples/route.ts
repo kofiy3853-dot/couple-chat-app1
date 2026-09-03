@@ -22,12 +22,19 @@ export async function GET() {
                     email: true,
                     image: true,
                     bio: true,
-
                   },
                 },
               },
             },
-            conversation: true,
+            conversation: {
+              select: {
+                id: true,
+                _count: { select: { messages: true } },
+              },
+            },
+            _count: {
+              select: { memories: true },
+            },
           },
         },
       },
@@ -37,14 +44,53 @@ export async function GET() {
       return successResponse(null);
     }
 
+    let unreadMessageCount = 0;
+    const c = coupleMember.couple;
+
+    if (c.conversation) {
+      if (coupleMember.lastReadMessageId) {
+        const lastReadMsg = await db.message.findUnique({
+          where: { id: coupleMember.lastReadMessageId },
+          select: { createdAt: true },
+        });
+        if (lastReadMsg) {
+          unreadMessageCount = await db.message.count({
+            where: {
+              conversationId: c.conversation.id,
+              senderId: { not: user.id },
+              createdAt: { gt: lastReadMsg.createdAt },
+            },
+          });
+        }
+      } else {
+        unreadMessageCount = await db.message.count({
+          where: {
+            conversationId: c.conversation.id,
+            senderId: { not: user.id },
+          },
+        });
+      }
+    }
+
     return successResponse({
-      ...coupleMember.couple,
-      memberCount: coupleMember.couple.members.length,
+      id: c.id,
+      anniversaryDate: c.anniversaryDate,
+      createdAt: c.createdAt,
+      members: c.members.map((m) => ({
+        userId: m.userId,
+        joinedAt: m.joinedAt,
+        user: m.user,
+      })),
+      conversation: c.conversation ? { id: c.conversation.id } : null,
+      messageCount: c.conversation?._count?.messages ?? 0,
+      unreadMessageCount,
+      memoryCount: c._count?.memories ?? 0,
     });
   } catch (error) {
     return errorResponse(error);
   }
 }
+
 
 export async function POST() {
   try {

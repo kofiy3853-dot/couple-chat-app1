@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Paperclip, Smile, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import type { Message } from "@/hooks/use-chat";
 
 const QUICK_EMOJIS = [
   "❤️", "😍", "🥰", "😘", "💕", "🌹",
@@ -19,6 +20,10 @@ interface MessageInputProps {
   sending?: boolean;
   conversationId?: string;
   className?: string;
+  replyingToMessage?: Message | null;
+  editingMessage?: Message | null;
+  onCancelReply?: () => void;
+  onCancelEdit?: () => void;
 }
 
 export function MessageInput({
@@ -29,6 +34,10 @@ export function MessageInput({
   sending = false,
   conversationId,
   className,
+  replyingToMessage,
+  editingMessage,
+  onCancelReply,
+  onCancelEdit,
 }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [showEmojis, setShowEmojis] = useState(false);
@@ -51,6 +60,15 @@ export function MessageInput({
   useEffect(() => {
     adjustHeight();
   }, [content, adjustHeight]);
+
+  useEffect(() => {
+    if (editingMessage) {
+      setContent(editingMessage.content);
+      textareaRef.current?.focus();
+    } else {
+      setContent("");
+    }
+  }, [editingMessage]);
 
   const handleSend = useCallback(async () => {
     if ((!content.trim() && !uploadFile) || sending) return;
@@ -169,7 +187,29 @@ export function MessageInput({
   const canSend = (content.trim() || uploadFile) && !sending && !disabled;
 
   return (
-    <div className={cn("border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 relative", className)}>
+    <div className={cn("border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 relative flex flex-col", className)}>
+      {(replyingToMessage || editingMessage) && (
+        <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <span className="font-medium text-rose-500 mb-0.5">
+              {editingMessage ? "Editing message" : `Replying to ${replyingToMessage?.sender.name || replyingToMessage?.sender.username || "partner"}`}
+            </span>
+            <span className="truncate opacity-80 text-xs">
+              {(editingMessage?.content || replyingToMessage?.content || "Image message")}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              if (editingMessage) onCancelEdit?.();
+              if (replyingToMessage) onCancelReply?.();
+            }}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors ml-2 shrink-0 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {uploadPreview && (
         <div className="px-4 pt-3">
           <div className="relative inline-block">

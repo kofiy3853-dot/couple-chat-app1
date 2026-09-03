@@ -9,12 +9,14 @@ import {
   Calendar,
   User,
   Link2,
+  Gamepad2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Chat", href: "/chat", icon: MessageCircle, coupleRequired: true },
+  { name: "Games", href: "/games", icon: Gamepad2, coupleRequired: true },
   { name: "Memories", href: "/memories", icon: Camera, coupleRequired: true },
   { name: "Timeline", href: "/timeline", icon: Calendar, coupleRequired: true },
   { name: "Profile", href: "/settings/profile", icon: User },

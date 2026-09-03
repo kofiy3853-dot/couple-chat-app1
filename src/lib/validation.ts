@@ -43,6 +43,7 @@ export const messageSchema = z.object({
     .string()
     .min(1, "Message cannot be empty")
     .max(5000, "Message must be at most 5000 characters"),
+  replyToId: z.string().uuid("Invalid replyToId").optional(),
 });
 
 export const memorySchema = z.object({

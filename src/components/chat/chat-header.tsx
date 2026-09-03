@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MoreVertical, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, MoreVertical, Settings, Trash2, Mic, Phone } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -11,11 +11,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import type { PresenceStatus } from "@/lib/constants";
 
 interface ChatHeaderProps {
   partnerName: string;
   partnerImage?: string | null;
-  isOnline?: boolean;
+  presenceStatus?: PresenceStatus;
   lastSeen?: string | null;
   onBack?: () => void;
   onClearHistory?: () => void;
@@ -53,13 +54,33 @@ function formatLastSeen(dateString: string): string {
 export function ChatHeader({
   partnerName,
   partnerImage,
-  isOnline = false,
+  presenceStatus = "offline",
   lastSeen,
   onBack,
   onClearHistory,
   className,
 }: ChatHeaderProps) {
   const router = useRouter();
+
+  const statusDotColor: Record<PresenceStatus, string> = {
+    "offline": "bg-gray-300 dark:bg-gray-600",
+    "online": "bg-green-500",
+    "typing": "bg-blue-500",
+    "recording": "bg-red-500 animate-pulse",
+    "in-call": "bg-purple-500",
+  };
+
+  const statusText: Record<PresenceStatus, { text: string; className: string }> = {
+    "offline": { text: "Offline", className: "text-gray-500 dark:text-gray-400" },
+    "online": { text: "Online", className: "text-green-500 font-medium" },
+    "typing": { text: "Typing...", className: "text-blue-500 font-medium" },
+    "recording": { text: "Recording", className: "text-red-500 font-medium" },
+    "in-call": { text: "In a call", className: "text-purple-500 font-medium" },
+  };
+
+  const currentStatus = statusText[presenceStatus];
+  const dotColor = statusDotColor[presenceStatus];
+
   return (
     <div
       className={cn(
@@ -86,7 +107,7 @@ export function ChatHeader({
         <div
           className={cn(
             "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-950",
-            isOnline ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
+            dotColor
           )}
         />
       </div>
@@ -95,15 +116,19 @@ export function ChatHeader({
         <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
           {partnerName}
         </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {isOnline ? (
-            <span className="text-green-500 font-medium">Online</span>
-          ) : lastSeen ? (
-            `Last seen ${formatLastSeen(lastSeen)}`
-          ) : (
-            "Offline"
+        <div className="flex items-center gap-1.5">
+          {presenceStatus === "recording" && (
+            <Mic className="h-3 w-3 text-red-500" />
           )}
-        </p>
+          {presenceStatus === "in-call" && (
+            <Phone className="h-3 w-3 text-purple-500" />
+          )}
+          <p className={cn("text-xs", currentStatus.className)}>
+            {presenceStatus === "offline" && lastSeen
+              ? `Last seen ${formatLastSeen(lastSeen)}`
+              : currentStatus.text}
+          </p>
+        </div>
       </div>
 
       <DropdownMenu>

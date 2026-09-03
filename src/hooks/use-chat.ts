@@ -30,6 +30,14 @@ interface Message {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  isEdited: boolean;
+  replyToId: string | null;
+  replyTo: {
+    id: string;
+    content: string;
+    type: "TEXT" | "IMAGE";
+    sender: { id: string; name: string | null; username: string | null };
+  } | null;
   sender: MessageSender;
   reactions: MessageReaction[];
   attachments: { id: string; url: string; filename: string; mimeType: string; size: number }[];
@@ -67,6 +75,16 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
       prev.map((m) =>
         m.id === messageId
           ? { ...m, deletedAt: new Date().toISOString() }
+          : m
+      )
+    );
+  }, []);
+
+  const markMessageEdited = useCallback((messageId: string, content: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, content, isEdited: true }
           : m
       )
     );
@@ -125,7 +143,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
   }, [loadingMore, hasMore, cursor, fetchMessages]);
 
   const sendMessage = useCallback(
-    async (content: string, type: "TEXT" | "IMAGE" = "TEXT") => {
+    async (content: string, type: "TEXT" | "IMAGE" = "TEXT", replyToId?: string) => {
       if (!conversationId || !content.trim()) return null;
 
       setSending(true);
@@ -133,7 +151,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
         const res = await fetch("/api/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ conversationId, content, type }),
+          body: JSON.stringify({ conversationId, content, type, replyToId }),
         });
 
         const data = await res.json();
@@ -164,6 +182,27 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
         prev.map((m) =>
           m.id === messageId
             ? { ...m, deletedAt: new Date().toISOString() }
+            : m
+        )
+      );
+      return true;
+    }
+    return false;
+  }, []);
+
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    const res = await fetch(`/api/messages/${messageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, content, isEdited: true }
             : m
         )
       );
@@ -226,10 +265,12 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
     loadMore,
     sendMessage,
     deleteMessage,
+    editMessage,
     addReaction,
     removeReaction,
     addRealtimeMessage,
     markMessageDeleted,
+    markMessageEdited,
     clearMessages,
   };
 }

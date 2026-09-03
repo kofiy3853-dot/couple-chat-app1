@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
+import { logoutAction } from "@/app/actions/logout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ export function SecuritySettings() {
   async function handleLogoutAll() {
     setLoggingOut(true);
     try {
-      await signOut({ callbackUrl: "/login" });
+      await logoutAction();
     } catch {
       setMessage("Failed to logout all sessions");
       setLoggingOut(false);

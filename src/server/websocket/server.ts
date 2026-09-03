@@ -3,6 +3,7 @@ import { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
 import { db } from "@/lib/db";
+import type { PresenceStatus } from "@/lib/constants";
 
 // Render passes the PORT environment variable dynamically for Web Services
 const PORT = parseInt(process.env.PORT || process.env.WS_PORT || "3001", 10);
@@ -58,7 +59,6 @@ interface AuthenticatedSocket extends Socket {
 }
 
 io.use(async (socket: AuthenticatedSocket, next) => {
-  // In demo mode, accept userId from query or auth
   const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
   if (!userId || typeof userId !== "string") {
     return next(new Error("User ID required"));
@@ -78,6 +78,7 @@ io.use(async (socket: AuthenticatedSocket, next) => {
 // ─── Online presence helpers ─────────────────────────────────────────────────
 const onlineUsers = new Map<string, Set<string>>(); // userId -> Set<socketId>
 const userRooms = new Map<string, Set<string>>();   // socketId -> Set<conversationId>
+const userPresence = new Map<string, PresenceStatus>(); // userId -> status
 
 async function setOnline(userId: string) {
   try {
@@ -97,6 +98,64 @@ async function setOffline(userId: string) {
   } catch {}
 }
 
+async function setPresenceStatus(userId: string, status: PresenceStatus) {
+  userPresence.set(userId, status);
+  try {
+    if (pubClient) {
+      await pubClient.set(`presence:${userId}`, status, "EX", 300);
+    }
+  } catch {}
+}
+
+async function clearPresenceStatus(userId: string) {
+  userPresence.delete(userId);
+  try {
+    if (pubClient) {
+      await pubClient.del(`presence:${userId}`);
+    }
+  } catch {}
+}
+
+async function getPresenceStatus(userId: string): Promise<PresenceStatus> {
+  if (userPresence.has(userId)) return userPresence.get(userId)!;
+  try {
+    if (pubClient) {
+      const status = await pubClient.get(`presence:${userId}`);
+      if (status && ["online", "typing", "recording", "in-call"].includes(status)) {
+        return status as PresenceStatus;
+      }
+    }
+  } catch {}
+  return "offline";
+}
+
+async function getFullPresenceSnapshot(): Promise<Record<string, PresenceStatus>> {
+  const snapshot: Record<string, PresenceStatus> = {};
+  const allUserIds = new Set<string>();
+
+  // Collect all known user IDs from online users
+  try {
+    if (pubClient) {
+      const members = await pubClient.smembers("online_users");
+      members.forEach((id) => allUserIds.add(id));
+    } else {
+      onlineUsers.forEach((_, id) => allUserIds.add(id));
+    }
+  } catch {
+    onlineUsers.forEach((_, id) => allUserIds.add(id));
+  }
+
+  // Build presence snapshot
+  for (const uid of allUserIds) {
+    if (userPresence.has(uid)) {
+      snapshot[uid] = userPresence.get(uid)!;
+    } else {
+      snapshot[uid] = "online";
+    }
+  }
+  return snapshot;
+}
+
 // ─── Connection handling ─────────────────────────────────────────────────────
 io.on("connection", async (socket: AuthenticatedSocket) => {
   const userId = socket.userId!;
@@ -114,20 +173,12 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 
   // Mark online & broadcast
   await setOnline(userId);
+  await setPresenceStatus(userId, "online");
   socket.broadcast.emit("user-online", { userId, userName });
 
-  // Send snapshot of currently online users to the newly connected client
-  let currentlyOnline: string[] = [];
-  try {
-    if (pubClient) {
-      currentlyOnline = await pubClient.smembers("online_users");
-    } else {
-      currentlyOnline = Array.from(onlineUsers.keys());
-    }
-  } catch {
-    currentlyOnline = Array.from(onlineUsers.keys());
-  }
-  socket.emit("online-users-snapshot", { userIds: currentlyOnline });
+  // Send full presence snapshot to the newly connected client
+  const presenceSnapshot = await getFullPresenceSnapshot();
+  socket.emit("presence-snapshot", presenceSnapshot);
 
   // ─── Join conversation ──────────────────────────────────────────────────
   socket.on("join-conversation", async (data: { conversationId: string }) => {
@@ -228,9 +279,20 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   });
 
   // ─── Message read ───────────────────────────────────────────────────────
-  socket.on("message-read", (data: { conversationId: string; lastReadMessageId: string }) => {
+  socket.on("message-read", async (data: { conversationId: string; lastReadMessageId: string }) => {
     const { conversationId, lastReadMessageId } = data;
     if (!conversationId || !lastReadMessageId) return;
+
+    // Save to database
+    try {
+      await db.coupleMember.updateMany({
+        where: { userId },
+        data: { lastReadMessageId },
+      });
+    } catch (err) {
+      console.error("[WS] message-read error:", err);
+    }
+
     io.to(`conversation:${conversationId}`).emit("messages-read", {
       conversationId,
       readBy: userId,
@@ -251,6 +313,44 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("typing-stop", (data: { conversationId: string }) => {
     if (!data.conversationId) return;
     socket.to(`conversation:${data.conversationId}`).emit("typing-stop", {
+      userId,
+      conversationId: data.conversationId,
+    });
+  });
+
+  // ─── Recording ──────────────────────────────────────────────────────────
+  socket.on("recording-start", (data: { conversationId: string }) => {
+    if (!data.conversationId) return;
+    setPresenceStatus(userId, "recording");
+    socket.to(`conversation:${data.conversationId}`).emit("recording-start", {
+      userId,
+      conversationId: data.conversationId,
+    });
+  });
+
+  socket.on("recording-stop", (data: { conversationId: string }) => {
+    if (!data.conversationId) return;
+    setPresenceStatus(userId, "online");
+    socket.to(`conversation:${data.conversationId}`).emit("recording-stop", {
+      userId,
+      conversationId: data.conversationId,
+    });
+  });
+
+  // ─── Call ───────────────────────────────────────────────────────────────
+  socket.on("call-start", (data: { conversationId: string }) => {
+    if (!data.conversationId) return;
+    setPresenceStatus(userId, "in-call");
+    socket.to(`conversation:${data.conversationId}`).emit("call-start", {
+      userId,
+      conversationId: data.conversationId,
+    });
+  });
+
+  socket.on("call-end", (data: { conversationId: string }) => {
+    if (!data.conversationId) return;
+    setPresenceStatus(userId, "online");
+    socket.to(`conversation:${data.conversationId}`).emit("call-end", {
       userId,
       conversationId: data.conversationId,
     });
@@ -278,6 +378,17 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     });
   });
 
+  // ─── Message edited ─────────────────────────────────────────────────────
+  socket.on("message-edited", (data: { messageId: string; conversationId: string; content: string }) => {
+    const { messageId, conversationId, content } = data;
+    if (!messageId || !conversationId) return;
+    io.to(`conversation:${conversationId}`).emit("message-edited", {
+      messageId,
+      content,
+      editedBy: userId,
+    });
+  });
+
   // ─── Delete message ─────────────────────────────────────────────────────
   socket.on("message-deleted", (data: { messageId: string; conversationId: string }) => {
     const { messageId, conversationId } = data;
@@ -297,6 +408,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
       sockets.delete(socket.id);
       if (sockets.size === 0) {
         onlineUsers.delete(userId);
+        await clearPresenceStatus(userId);
         setOffline(userId);
         socket.broadcast.emit("user-offline", { userId });
       }

@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Trash2, Pencil, Reply, Copy } from "lucide-react";
 import Image from "next/image";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ interface MessageItemProps {
   isRead?: boolean;
   onDelete?: (messageId: string) => void;
   onReaction?: (messageId: string, emoji: string) => void;
+  onReply?: (messageId: string) => void;
+  onEdit?: (messageId: string) => void;
 }
 
 function getInitials(name: string | null): string {
@@ -42,6 +44,8 @@ function MessageItemInner({
   isRead = false,
   onDelete,
   onReaction,
+  onReply,
+  onEdit,
 }: MessageItemProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -97,6 +101,21 @@ function MessageItemInner({
             isDeleted && "opacity-60"
           )}
         >
+          {message.replyTo && !isDeleted && (
+            <div
+              className={cn(
+                "mb-2 pl-3 py-1 border-l-2 text-xs opacity-75 relative rounded-sm bg-black/5 dark:bg-white/5",
+                isOwn ? "border-white/50" : "border-gray-400 dark:border-gray-500"
+              )}
+            >
+              <div className="font-semibold mb-0.5 truncate">
+                {message.replyTo.sender.name || message.replyTo.sender.username}
+              </div>
+              <div className="truncate">
+                {message.replyTo.content || "Image"}
+              </div>
+            </div>
+          )}
           {isDeleted ? (
             <div className="flex items-center gap-1.5 text-sm italic opacity-60">
               <Trash2 className="h-3.5 w-3.5" />
@@ -136,6 +155,7 @@ function MessageItemInner({
         >
           <span className="text-[10px] text-gray-400 dark:text-gray-500">
             {formatMessageTime(message.createdAt)}
+            {message.isEdited && <span className="ml-1 italic">(edited)</span>}
           </span>
 
           {isOwn && !isDeleted && (
@@ -184,6 +204,31 @@ function MessageItemInner({
             <ReactionPicker
               onSelect={(emoji) => onReaction?.(message.id, emoji)}
             />
+            {onReply && (
+              <button
+                onClick={() => onReply(message.id)}
+                className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                title="Reply"
+              >
+                <Reply className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
+              </button>
+            )}
+            <button
+              onClick={() => navigator.clipboard.writeText(message.content)}
+              className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+              title="Copy"
+            >
+              <Copy className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
+            </button>
+            {isOwn && message.type === "TEXT" && onEdit && (
+              <button
+                onClick={() => onEdit(message.id)}
+                className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                title="Edit"
+              >
+                <Pencil className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
+              </button>
+            )}
             {isOwn && onDelete && (
               <button
                 onClick={() => onDelete(message.id)}
@@ -202,6 +247,7 @@ function MessageItemInner({
 export const MessageItem = memo(MessageItemInner, (prev, next) =>
   prev.message.id === next.message.id &&
   prev.message.content === next.message.content &&
+  prev.message.isEdited === next.message.isEdited &&
   prev.message.deletedAt === next.message.deletedAt &&
   prev.message.reactions.length === next.message.reactions.length &&
   prev.isOwn === next.isOwn &&

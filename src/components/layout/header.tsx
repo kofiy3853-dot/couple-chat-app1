@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
-import { Bell, Settings, LogOut } from "lucide-react";
+import { logoutAction } from "@/app/actions/logout";
+import { Bell, Settings, LogOut, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -37,6 +38,7 @@ const routeTitles: Record<string, string> = {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
+  const [loggingOut, setLoggingOut] = useState(false);
   const getTitle = () => {
     if (routeTitles[pathname]) return routeTitles[pathname];
     const segments = pathname.split("/").filter(Boolean);
@@ -112,11 +114,20 @@ export function Header({ user }: HeaderProps) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={async () => {
+                if (loggingOut) return;
+                setLoggingOut(true);
+                await logoutAction();
+              }}
+              disabled={loggingOut}
               className="cursor-pointer text-red-600 focus:text-red-600"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Log out
+              {loggingOut ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LogOut className="h-4 w-4 mr-2" />
+              )}
+              {loggingOut ? "Logging out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

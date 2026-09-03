@@ -11,6 +11,7 @@ import { TypingIndicator } from "./typing-indicator";
 import { EmptyChat } from "./empty-chat";
 import { NoCoupleView } from "@/components/dashboard/no-couple-view";
 import { cn } from "@/lib/utils";
+import type { PresenceStatus } from "@/lib/constants";
 
 interface CoupleData {
   id: string;
@@ -38,6 +39,8 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const { data: session } = useSession();
   const currentUser = session?.user;
 
@@ -56,9 +59,11 @@ export function ChatContainer({ className }: ChatContainerProps) {
     loadMore,
     sendMessage,
     deleteMessage,
+    editMessage,
     addReaction,
     addRealtimeMessage,
     markMessageDeleted,
+    markMessageEdited,
     clearMessages,
   } = useChat({
     conversationId,
@@ -75,10 +80,15 @@ export function ChatContainer({ className }: ChatContainerProps) {
     [markMessageDeleted]
   );
 
+  const handleMarkMessageEdited = useCallback(
+    (data: { messageId: string; content: string }) => markMessageEdited(data.messageId, data.content),
+    [markMessageEdited]
+  );
+
   const {
     connected,
     typingState,
-    onlineState,
+    presenceState,
     startTyping,
     stopTyping,
     markAsRead,
@@ -87,6 +97,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
     userId: currentUser?.id || "",
     onNewMessage: handleNewMessage,
     onMessageDeleted: handleMarkMessageDeleted,
+    onMessageEdited: handleMarkMessageEdited,
   });
 
   useEffect(() => {
@@ -109,7 +120,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
     }
   }, [currentUser?.id]);
   // Use onlineState from useSocket (plain React state) — Zustand Set doesn't reliably trigger re-renders
-  const isPartnerOnline = partnerUser ? (onlineState[partnerUser.id] === true) : false;
+  const partnerPresence: PresenceStatus = partnerUser ? (presenceState[partnerUser.id] ?? "offline") : "offline";
   // Use typingState from useSocket (plain React state) — Zustand Set doesn't reliably trigger re-renders
   const isPartnerTyping = partnerUser ? (typingState[partnerUser.id] === true) : false;
 
@@ -141,9 +152,15 @@ export function ChatContainer({ className }: ChatContainerProps) {
 
   const handleSend = useCallback(
     async (content: string) => {
-      await sendMessage(content);
+      if (editingMessage) {
+        await editMessage(editingMessage, content);
+        setEditingMessage(null);
+      } else {
+        await sendMessage(content, "TEXT", replyingTo ?? undefined);
+        setReplyingTo(null);
+      }
     },
-    [sendMessage]
+    [editingMessage, editMessage, sendMessage, replyingTo]
   );
 
   const handleDelete = useCallback(
@@ -200,7 +217,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
       <ChatHeader
         partnerName={partnerUser.name ?? partnerUser.username ?? "Partner"}
         partnerImage={partnerUser.image}
-        isOnline={isPartnerOnline}
+        presenceStatus={partnerPresence}
         lastSeen={null}
         onClearHistory={handleClearHistory}
       />
@@ -217,11 +234,14 @@ export function ChatContainer({ className }: ChatContainerProps) {
         onDelete={handleDelete}
         onReaction={handleReaction}
         onMarkRead={handleMarkRead}
+        onReply={(messageId) => { setReplyingTo(messageId); setEditingMessage(null); }}
+        onEdit={(messageId) => { setEditingMessage(messageId); setReplyingTo(null); }}
       />
 
       <TypingIndicator
         isVisible={isPartnerTyping}
         partnerName={partnerUser.name?.split(" ")[0] ?? undefined}
+        presenceStatus={partnerPresence}
       />
 
       <MessageInput
@@ -230,6 +250,14 @@ export function ChatContainer({ className }: ChatContainerProps) {
         onStopTyping={handleStopTyping}
         sending={sending}
         conversationId={conversationId}
+        replyingToMessage={
+          replyingTo ? messages.find((m) => m.id === replyingTo) : null
+        }
+        editingMessage={
+          editingMessage ? messages.find((m) => m.id === editingMessage) : null
+        }
+        onCancelReply={() => setReplyingTo(null)}
+        onCancelEdit={() => setEditingMessage(null)}
       />
     </div>
   );

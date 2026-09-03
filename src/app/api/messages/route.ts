@@ -62,6 +62,14 @@ export async function GET(request: NextRequest) {
             image: true,
           },
         },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            sender: { select: { id: true, name: true, username: true } },
+          },
+        },
         reactions: {
           include: {
             user: {
@@ -118,6 +126,7 @@ export async function POST(request: NextRequest) {
       content: string;
       type?: string;
     };
+    const replyToId = parsed.data.replyToId;
 
     if (!conversationId) {
       return errorResponse(
@@ -156,6 +165,7 @@ export async function POST(request: NextRequest) {
         senderId: user.id,
         content: parsed.data.content,
         type: (type === "IMAGE" ? "IMAGE" : "TEXT") as "TEXT" | "IMAGE",
+        replyToId,
       },
       include: {
         sender: {
@@ -164,6 +174,14 @@ export async function POST(request: NextRequest) {
             name: true,
             username: true,
             image: true,
+          },
+        },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            sender: { select: { id: true, name: true, username: true } },
           },
         },
         reactions: true,

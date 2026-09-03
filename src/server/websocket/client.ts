@@ -87,11 +87,17 @@ class WebSocketClient {
       "messages-read",
       "typing-start",
       "typing-stop",
+      "recording-start",
+      "recording-stop",
+      "call-start",
+      "call-end",
       "reaction-added",
       "reaction-removed",
       "message-deleted",
+      "message-edited",
       "user-online",
       "user-offline",
+      "presence-snapshot",
       "error",
     ];
 
@@ -156,6 +162,22 @@ class WebSocketClient {
     this.socket?.emit("typing-stop", { conversationId });
   }
 
+  startRecording(conversationId: string): void {
+    this.socket?.emit("recording-start", { conversationId });
+  }
+
+  stopRecording(conversationId: string): void {
+    this.socket?.emit("recording-stop", { conversationId });
+  }
+
+  startCall(conversationId: string): void {
+    this.socket?.emit("call-start", { conversationId });
+  }
+
+  endCall(conversationId: string): void {
+    this.socket?.emit("call-end", { conversationId });
+  }
+
   addReaction(messageId: string, conversationId: string, emoji: string): void {
     this.socket?.emit("reaction-added", { messageId, conversationId, emoji });
   }
@@ -166,6 +188,10 @@ class WebSocketClient {
 
   deleteMessage(messageId: string, conversationId: string): void {
     this.socket?.emit("message-deleted", { messageId, conversationId });
+  }
+
+  editMessage(messageId: string, conversationId: string, content: string): void {
+    this.socket?.emit("message-edited", { messageId, conversationId, content });
   }
 
   markAsRead(conversationId: string, lastReadMessageId: string): void {

@@ -33,6 +33,17 @@ export const WS_RECONNECT_MAX_DELAY = 30000;
 export const WS_CONNECTION_TIMEOUT = 10000;
 export const WS_PRESENCE_TTL = 300; // 5 minutes in seconds
 
+// ─── Presence ───────────────────────────────────────────────────────────────
+export const PRESENCE_STATUS = {
+  OFFLINE: "offline",
+  ONLINE: "online",
+  TYPING: "typing",
+  RECORDING: "recording",
+  IN_CALL: "in-call",
+} as const;
+
+export type PresenceStatus = (typeof PRESENCE_STATUS)[keyof typeof PRESENCE_STATUS];
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 export const MESSAGE_FETCH_LIMIT = 50;
 export const CHAT_POLL_INTERVAL = 3000; // 3 seconds
