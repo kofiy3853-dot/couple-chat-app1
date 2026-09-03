@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, HelpCircle, GitBranch, Star, Brain, Sparkles } from "lucide-react";
+import { Flame, HelpCircle, GitBranch, Star, Brain, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/hooks/use-socket";
 import { TruthOrDare } from "./truth-or-dare";
 import { CouplesQuiz } from "./couples-quiz";
 import { WouldYouRather } from "./would-you-rather";
@@ -17,63 +18,121 @@ const games = [
   {
     id: "truth-or-dare" as const,
     name: "Truth or Dare",
-    description: "Answer truthfully or take on a fun dare!",
+    description: "Send challenges to your partner in real-time!",
     icon: Flame,
-    color: "from-red-500 to-orange-500",
     bgLight: "bg-red-50",
     textColor: "text-red-600",
+    multiplayer: true,
   },
   {
     id: "couples-quiz" as const,
     name: "Couples Quiz",
     description: "Test how well you know each other.",
     icon: HelpCircle,
-    color: "from-blue-500 to-cyan-500",
     bgLight: "bg-blue-50",
     textColor: "text-blue-600",
+    multiplayer: false,
   },
   {
     id: "would-you-rather" as const,
     name: "Would You Rather",
     description: "Pick between two fun scenarios.",
     icon: GitBranch,
-    color: "from-purple-500 to-pink-500",
     bgLight: "bg-purple-50",
     textColor: "text-purple-600",
+    multiplayer: false,
   },
   {
     id: "rate-each-other" as const,
     name: "Rate Each Other",
     description: "Rate different aspects of your relationship.",
     icon: Star,
-    color: "from-yellow-500 to-amber-500",
     bgLight: "bg-yellow-50",
     textColor: "text-yellow-600",
+    multiplayer: false,
   },
   {
     id: "two-truths-lie" as const,
     name: "Two Truths & a Lie",
     description: "Guess which statement is the lie!",
     icon: Brain,
-    color: "from-emerald-500 to-teal-500",
     bgLight: "bg-emerald-50",
     textColor: "text-emerald-600",
+    multiplayer: false,
   },
 ];
 
 export function GamesPage() {
   const [activeGame, setActiveGame] = useState<GameId>(null);
-  const router = useRouter();
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { data: session } = useSession();
+  const userId = session?.user?.id || "";
+
+  useEffect(() => {
+    async function fetchCouple() {
+      try {
+        const res = await fetch("/api/couples");
+        const data = await res.json();
+        if (data.success && data.data?.conversation?.id) {
+          setConversationId(data.data.conversation.id);
+        }
+      } catch {
+        // no-op
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (userId) fetchCouple();
+  }, [userId]);
+
+  const handleNewMessage = useCallback(() => {}, []);
+  const handleGameChallenge = useCallback(() => {}, []);
+  const handleGameChoice = useCallback(() => {}, []);
+  const handleGameQuestion = useCallback(() => {}, []);
+  const handleGameAnswer = useCallback(() => {}, []);
+  const handleGameEnded = useCallback(() => {}, []);
+
+  const {
+    connected,
+    startGame,
+    makeChoice,
+    sendQuestion,
+    sendAnswer,
+    endGame,
+  } = useSocket({
+    conversationId,
+    userId,
+    onNewMessage: handleNewMessage,
+    onGameChallengeReceived: handleGameChallenge,
+    onGameChoiceMade: handleGameChoice,
+    onGameQuestionReceived: handleGameQuestion,
+    onGameAnswerResult: handleGameAnswer,
+    onGameEnded: handleGameEnded,
+  });
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 text-rose-500 animate-spin" />
+      </div>
+    );
+  }
 
   if (activeGame) {
-    const game = games.find((g) => g.id === activeGame);
-    if (!game) return null;
-
     const handleBack = () => setActiveGame(null);
 
     switch (activeGame) {
       case "truth-or-dare":
-        return <TruthOrDare onBack={handleBack} />;
+        return (
+          <TruthOrDare
+            onBack={handleBack}
+            conversationId={conversationId}
+            userId={userId}
+            connected={connected}
+            socketActions={{ startGame, makeChoice, sendQuestion, sendAnswer, endGame }}
+          />
+        );
       case "couples-quiz":
         return <CouplesQuiz onBack={handleBack} />;
       case "would-you-rather":
@@ -115,7 +174,12 @@ export function GamesPage() {
                 <h3 className="font-semibold text-gray-900">{game.name}</h3>
                 <p className="text-sm text-gray-500">{game.description}</p>
               </div>
-              <div className="text-gray-400">
+              {game.multiplayer && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium shrink-0">
+                  Live
+                </span>
+              )}
+              <div className="text-gray-400 shrink-0">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

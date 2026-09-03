@@ -98,6 +98,11 @@ class WebSocketClient {
       "user-online",
       "user-offline",
       "presence-snapshot",
+      "game-challenge-received",
+      "game-choice-made",
+      "game-question-received",
+      "game-answer-result",
+      "game-ended",
       "error",
     ];
 
@@ -200,6 +205,27 @@ class WebSocketClient {
 
   deliverMessage(messageId: string, conversationId: string): void {
     this.socket?.emit("message-delivered", { messageId, conversationId });
+  }
+
+  // ─── Game methods ──────────────────────────────────────────────────────
+  startGame(conversationId: string, type: "truth" | "dare"): void {
+    this.socket?.emit("game-start", { conversationId, type });
+  }
+
+  makeChoice(conversationId: string, type: "truth" | "dare"): void {
+    this.socket?.emit("game-choice", { conversationId, type });
+  }
+
+  sendQuestion(conversationId: string, question: string, type: "truth" | "dare"): void {
+    this.socket?.emit("game-question", { conversationId, question, type });
+  }
+
+  sendAnswer(conversationId: string, completed: boolean): void {
+    this.socket?.emit("game-answer", { conversationId, completed });
+  }
+
+  endGame(conversationId: string): void {
+    this.socket?.emit("game-end", { conversationId });
   }
 
   // ─── Event emitter ──────────────────────────────────────────────────────

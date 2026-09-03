@@ -419,6 +419,61 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     });
   });
 
+  // ─── Game: Truth or Dare ────────────────────────────────────────────────
+  // Player 1 starts game, sends choice to Player 2
+  socket.on("game-start", (data: { conversationId: string; type: "truth" | "dare" }) => {
+    const { conversationId, type } = data;
+    if (!conversationId || !type) return;
+    io.to(`conversation:${conversationId}`).emit("game-challenge-received", {
+      fromUserId: userId,
+      fromUserName: userName,
+      type,
+    });
+  });
+
+  // Player 2 responds with their choice
+  socket.on("game-choice", (data: { conversationId: string; type: "truth" | "dare" }) => {
+    const { conversationId, type } = data;
+    if (!conversationId || !type) return;
+    io.to(`conversation:${conversationId}`).emit("game-choice-made", {
+      fromUserId: userId,
+      fromUserName: userName,
+      type,
+    });
+  });
+
+  // Player 1 sends the specific question/dare to Player 2
+  socket.on("game-question", (data: { conversationId: string; question: string; type: "truth" | "dare" }) => {
+    const { conversationId, question, type } = data;
+    if (!conversationId || !question) return;
+    io.to(`conversation:${conversationId}`).emit("game-question-received", {
+      fromUserId: userId,
+      fromUserName: userName,
+      question,
+      type,
+    });
+  });
+
+  // Player 2 completes or skips the challenge
+  socket.on("game-answer", (data: { conversationId: string; completed: boolean }) => {
+    const { conversationId, completed } = data;
+    if (!conversationId) return;
+    io.to(`conversation:${conversationId}`).emit("game-answer-result", {
+      fromUserId: userId,
+      fromUserName: userName,
+      completed,
+    });
+  });
+
+  // Either player ends the game
+  socket.on("game-end", (data: { conversationId: string }) => {
+    const { conversationId } = data;
+    if (!conversationId) return;
+    io.to(`conversation:${conversationId}`).emit("game-ended", {
+      fromUserId: userId,
+    });
+  });
+
   // ─── Disconnect ─────────────────────────────────────────────────────────
   socket.on("disconnect", async (reason) => {
     console.log(`[WS] ${userName} disconnected (${socket.id}): ${reason}`);

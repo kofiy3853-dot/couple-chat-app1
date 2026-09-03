@@ -12,16 +12,16 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
 
-  // Forward the pathname as a request header so server components (e.g. layout)
+  // Forward the pathname as a response header so server components (e.g. layout)
   // can read the current route via headers().get("x-pathname").
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-pathname", pathname);
 
   if (authRoutes.some((route) => pathname.startsWith(route))) {
     if (session) {
       return NextResponse.redirect(new URL("/", req.url));
     }
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next();
+    response.headers.set("x-pathname", pathname);
+    return response;
   }
 
   if (protectedRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))) {
@@ -41,7 +41,9 @@ export default auth((req) => {
     }
   }
 
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next();
+  response.headers.set("x-pathname", pathname);
+  return response;
 });
 
 

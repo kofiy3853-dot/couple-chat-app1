@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GameLayout } from "./game-layout";
-import { Flame, Heart, Sparkles, RotateCcw, Share2 } from "lucide-react";
+import { Flame, Heart, Sparkles, RotateCcw, Loader2, Users } from "lucide-react";
 
 const truths = [
   "What's your favorite memory of us?",
@@ -54,122 +54,193 @@ const dares = [
   "Do a silly dance and make your partner laugh",
 ];
 
-export function TruthOrDare({ onBack }: { onBack: () => void }) {
-  const [completed, setCompleted] = useState(0);
-  const [skipped, setSkipped] = useState(0);
-  const [currentChallenge, setCurrentChallenge] = useState<string | null>(null);
+type GamePhase =
+  | "idle"
+  | "waiting-partner-choice"
+  | "partner-sent-choice"
+  | "pick-question"
+  | "waiting-partner-answer"
+  | "received-question"
+  | "round-result"
+  | "game-over";
+
+interface SocketActions {
+  startGame: (conversationId: string, type: "truth" | "dare") => void;
+  makeChoice: (conversationId: string, type: "truth" | "dare") => void;
+  sendQuestion: (conversationId: string, question: string, type: "truth" | "dare") => void;
+  sendAnswer: (conversationId: string, completed: boolean) => void;
+  endGame: (conversationId: string) => void;
+}
+
+interface TruthOrDareProps {
+  onBack: () => void;
+  conversationId: string | null;
+  userId: string;
+  connected: boolean;
+  socketActions: SocketActions;
+}
+
+export function TruthOrDare({ onBack, conversationId, userId, connected, socketActions }: TruthOrDareProps) {
+  const [phase, setPhase] = useState<GamePhase>("idle");
+  const [myScore, setMyScore] = useState(0);
+  const [partnerScore, setPartnerScore] = useState(0);
+  const [round, setRound] = useState(1);
   const [challengeType, setChallengeType] = useState<"truth" | "dare" | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [done, setDone] = useState(false);
-  const [history, setHistory] = useState<{ type: "truth" | "dare"; challenge: string; didIt: boolean }[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState("");
+  const [lastResult, setLastResult] = useState<{ completed: boolean; by: string } | null>(null);
+  const hasListeners = useRef(false);
 
-  const getRandomChallenge = useCallback((type: "truth" | "dare") => {
-    const pool = type === "truth" ? truths : dares;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }, []);
+  // Socket event handlers
+  const handleGameChallenge = useCallback((data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+    if (data.fromUserId === userId) return;
+    setPartnerName(data.fromUserName);
+    setChallengeType(data.type);
+    setPhase("partner-sent-choice");
+  }, [userId]);
 
-  const handleChoice = (type: "truth" | "dare") => {
-    const challenge = getRandomChallenge(type);
-    setCurrentChallenge(challenge);
+  const handleGameChoice = useCallback((data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+    if (data.fromUserId === userId) return;
+    setChallengeType(data.type);
+    setPhase("pick-question");
+  }, [userId]);
+
+  const handleGameQuestion = useCallback((data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => {
+    if (data.fromUserId === userId) return;
+    setSelectedQuestion(data.question);
+    setChallengeType(data.type);
+    setPartnerName(data.fromUserName);
+    setPhase("received-question");
+  }, [userId]);
+
+  const handleGameAnswer = useCallback((data: { fromUserId: string; fromUserName: string; completed: boolean }) => {
+    if (data.fromUserId === userId) return;
+    setLastResult({ completed: data.completed, by: data.fromUserName });
+    if (data.completed) setPartnerScore((s) => s + 1);
+    setPhase("round-result");
+  }, [userId]);
+
+  const handleGameEnded = useCallback((data: { fromUserId: string }) => {
+    if (data.fromUserId === userId) return;
+    setPhase("game-over");
+  }, [userId]);
+
+  // Re-register callbacks when they change
+  const gamePage = document.querySelector('[data-game-page="truth-or-dare"]');
+  useEffect(() => {
+    // This is a workaround - the GamesPage already registers the listeners
+    // We just need to update the refs
+  }, [handleGameChallenge, handleGameChoice, handleGameQuestion, handleGameAnswer, handleGameEnded]);
+
+  if (!conversationId) {
+    return (
+      <GameLayout title="Truth or Dare" onBack={onBack}>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">No partner connected</h2>
+            <p className="text-gray-500 mb-4">You need to be in a couple to play Truth or Dare.</p>
+            <Button variant="outline" onClick={onBack}>Back to Games</Button>
+          </CardContent>
+        </Card>
+      </GameLayout>
+    );
+  }
+
+  const pool = challengeType === "truth" ? truths : dares;
+
+  const handleSendChallenge = (type: "truth" | "dare") => {
     setChallengeType(type);
-    setShowResult(false);
-    setDone(false);
+    socketActions.startGame(conversationId, type);
+    setPhase("waiting-partner-choice");
   };
 
-  const handleComplete = (didIt: boolean) => {
-    setShowResult(true);
-    setDone(true);
-    if (didIt) {
-      setCompleted((c) => c + 1);
-    } else {
-      setSkipped((s) => s + 1);
-    }
-    setHistory((h) => [...h, { type: challengeType!, challenge: currentChallenge!, didIt }]);
+  const handlePartnerChoice = (type: "truth" | "dare") => {
+    socketActions.makeChoice(conversationId, type);
+    setChallengeType(type);
+    setPhase("pick-question");
   };
 
-  const handleNext = () => {
-    setCurrentChallenge(null);
+  const handleSelectQuestion = (question: string) => {
+    setSelectedQuestion(question);
+    socketActions.sendQuestion(conversationId, question, challengeType!);
+    setPhase("waiting-partner-answer");
+  };
+
+  const handleAnswer = (completed: boolean) => {
+    socketActions.sendAnswer(conversationId, completed);
+    if (completed) setMyScore((s) => s + 1);
+    setLastResult({ completed, by: "You" });
+    setPhase("round-result");
+  };
+
+  const handleNextRound = () => {
+    setPhase("idle");
     setChallengeType(null);
-    setShowResult(false);
-    setDone(false);
+    setSelectedQuestion(null);
+    setLastResult(null);
+    setRound((r) => r + 1);
   };
 
-  const total = completed + skipped;
+  const handleEndGame = () => {
+    socketActions.endGame(conversationId);
+    setPhase("game-over");
+  };
 
   return (
-    <GameLayout title="Truth or Dare" subtitle="Take on challenges together!" onBack={onBack}>
+    <GameLayout
+      title="Truth or Dare"
+      subtitle={`Round ${round} · ${connected ? "Connected" : "Connecting..."}`}
+      onBack={onBack}
+    >
       <div className="space-y-6">
         {/* Score */}
         <div className="flex gap-3">
           <Card className="flex-1">
             <CardContent className="p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">You</p>
               <Badge variant="secondary" className="bg-green-50 text-green-600">
-                <Heart className="h-3 w-3 mr-1" />{completed} completed
+                <Heart className="h-3 w-3 mr-1" />{myScore}
               </Badge>
             </CardContent>
           </Card>
           <Card className="flex-1">
             <CardContent className="p-3 text-center">
-              <Badge variant="secondary" className="bg-gray-50 text-gray-600">
-                {skipped} skipped
+              <p className="text-xs text-gray-500 mb-1">{partnerName || "Partner"}</p>
+              <Badge variant="secondary" className="bg-blue-50 text-blue-600">
+                <Heart className="h-3 w-3 mr-1" />{partnerScore}
               </Badge>
             </CardContent>
           </Card>
         </div>
 
-        {/* Challenge */}
-        {currentChallenge ? (
-          <Card className={cn(
-            "border-2",
-            challengeType === "truth" ? "border-blue-500 bg-blue-50/50" : "border-orange-500 bg-orange-50/50"
-          )}>
-            <CardContent className="p-6 text-center">
-              <Badge className={cn("mb-4", challengeType === "truth" ? "bg-blue-500" : "bg-orange-500")}>
-                {challengeType === "truth" ? "TRUTH" : "DARE"}
-              </Badge>
-              <p className="text-lg font-medium text-gray-900 mb-6">{currentChallenge}</p>
-              {!done ? (
-                <div className="flex gap-3 justify-center">
-                  <Button
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => handleComplete(false)}
-                  >
-                    Skip
-                  </Button>
-                  <Button
-                    className="bg-green-500 hover:bg-green-600"
-                    onClick={() => handleComplete(true)}
-                  >
-                    <Heart className="h-4 w-4 mr-2" /> Did it!
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={handleNext} className="w-full">
-                  Next Challenge →
-                </Button>
-              )}
+        {!connected && (
+          <Card className="border-yellow-200 bg-yellow-50/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-yellow-600 animate-spin" />
+              <p className="text-sm text-yellow-700">Connecting to game server...</p>
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {/* Phase: Idle - Send challenge */}
+        {phase === "idle" && connected && (
           <Card>
             <CardContent className="p-6 text-center">
-              <p className="text-gray-500 mb-6">
-                {total === 0 ? "Pick your challenge!" : `You've done ${completed} challenges so far`}
-              </p>
+              <p className="text-gray-500 mb-6">Send a challenge to your partner!</p>
               <div className="flex gap-4 justify-center">
                 <Button
                   size="lg"
                   variant="outline"
                   className="h-20 px-8 text-lg border-blue-200 text-blue-600 hover:bg-blue-50"
-                  onClick={() => handleChoice("truth")}
+                  onClick={() => handleSendChallenge("truth")}
                 >
                   <Flame className="h-5 w-5 mr-2" /> Truth
                 </Button>
                 <Button
                   size="lg"
                   className="h-20 px-8 text-lg bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                  onClick={() => handleChoice("dare")}
+                  onClick={() => handleSendChallenge("dare")}
                 >
                   <Sparkles className="h-5 w-5 mr-2" /> Dare
                 </Button>
@@ -178,42 +249,160 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
           </Card>
         )}
 
-        {/* History */}
-        {history.length > 0 && (
+        {/* Phase: Waiting for partner to choose */}
+        {phase === "waiting-partner-choice" && (
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardContent className="p-6 text-center">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-3" />
+              <p className="font-medium text-gray-900">Waiting for your partner...</p>
+              <p className="text-sm text-gray-500 mt-1">You sent a {challengeType} challenge</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Phase: Partner sent choice - you pick truth or dare for them */}
+        {phase === "partner-sent-choice" && (
+          <Card className="border-purple-200 bg-purple-50/50">
+            <CardContent className="p-6 text-center">
+              <p className="text-sm text-gray-500 mb-2">{partnerName} wants to play!</p>
+              <p className="font-medium text-gray-900 mb-4">They chose {challengeType === "truth" ? "Truth" : "Dare"}</p>
+              <p className="text-sm text-gray-500 mb-4">Now pick what they should do:</p>
+              <Button onClick={() => handlePartnerChoice(challengeType!)} className="w-full">
+                Pick a {challengeType} for them →
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Phase: Pick question for partner */}
+        {phase === "pick-question" && (
           <Card>
             <CardContent className="p-4">
-              <p className="text-sm font-medium text-gray-500 mb-3">Recent challenges</p>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {history.slice().reverse().map((h, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
-                    <Badge variant="outline" className={cn("text-xs", h.type === "truth" ? "text-blue-600" : "text-orange-600")}>
-                      {h.type === "truth" ? "T" : "D"}
-                    </Badge>
-                    <span className="text-gray-700 truncate flex-1">{h.challenge}</span>
-                    {h.didIt ? (
-                      <Heart className="h-3 w-3 text-green-500 shrink-0" />
-                    ) : (
-                      <span className="text-xs text-gray-400 shrink-0">skipped</span>
-                    )}
-                  </div>
+              <p className="text-sm font-medium text-gray-500 mb-3">
+                Pick a {challengeType} for {partnerName}:
+              </p>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {pool.map((question, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSelectQuestion(question)}
+                    className="w-full p-3 text-left rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-sm"
+                  >
+                    {question}
+                  </button>
                 ))}
               </div>
             </CardContent>
           </Card>
         )}
 
-        {total >= 5 && (
+        {/* Phase: Waiting for partner to answer */}
+        {phase === "waiting-partner-answer" && (
+          <Card className="border-orange-200 bg-orange-50/50">
+            <CardContent className="p-6 text-center">
+              <Loader2 className="h-8 w-8 text-orange-500 animate-spin mx-auto mb-3" />
+              <Badge className={cn("mb-3", challengeType === "truth" ? "bg-blue-500" : "bg-orange-500")}>
+                {challengeType === "truth" ? "TRUTH" : "DARE"}
+              </Badge>
+              <p className="font-medium text-gray-900 mb-1">{selectedQuestion}</p>
+              <p className="text-sm text-gray-500">Waiting for {partnerName} to respond...</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Phase: Received question from partner */}
+        {phase === "received-question" && (
+          <Card className={cn(
+            "border-2",
+            challengeType === "truth" ? "border-blue-500 bg-blue-50/50" : "border-orange-500 bg-orange-50/50"
+          )}>
+            <CardContent className="p-6 text-center">
+              <p className="text-sm text-gray-500 mb-2">{partnerName} challenges you!</p>
+              <Badge className={cn("mb-4", challengeType === "truth" ? "bg-blue-500" : "bg-orange-500")}>
+                {challengeType === "truth" ? "TRUTH" : "DARE"}
+              </Badge>
+              <p className="text-lg font-medium text-gray-900 mb-6">{selectedQuestion}</p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => handleAnswer(false)}
+                >
+                  Skip
+                </Button>
+                <Button
+                  className="bg-green-500 hover:bg-green-600"
+                  onClick={() => handleAnswer(true)}
+                >
+                  <Heart className="h-4 w-4 mr-2" /> Did it!
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Phase: Round result */}
+        {phase === "round-result" && lastResult && (
+          <Card className={cn(
+            "border-2",
+            lastResult.completed ? "border-green-500 bg-green-50/50" : "border-gray-300"
+          )}>
+            <CardContent className="p-6 text-center">
+              <p className="font-medium text-gray-900 mb-1">
+                {lastResult.by === "You" ? "You" : partnerName} {lastResult.completed ? "completed the challenge!" : "skipped the challenge"}
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                {lastResult.completed ? "Nice work! 💕" : "Maybe next time! 😄"}
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={handleNextRound} className="flex-1">
+                  Next Round →
+                </Button>
+                <Button variant="outline" onClick={handleEndGame} className="flex-1">
+                  End Game
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Phase: Game over */}
+        {phase === "game-over" && (
           <Card className="border-rose-200 bg-rose-50/50">
-            <CardContent className="p-4 text-center">
-              <p className="font-medium text-gray-900 mb-2">
-                You completed {completed} out of {total} challenges!
+            <CardContent className="p-8 text-center">
+              <Sparkles className="h-12 w-12 text-rose-500 mx-auto mb-3" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Game Over!</h2>
+              <div className="flex gap-6 justify-center mb-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">You</p>
+                  <p className="text-3xl font-bold text-green-500">{myScore}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">{partnerName || "Partner"}</p>
+                  <p className="text-3xl font-bold text-blue-500">{partnerScore}</p>
+                </div>
+              </div>
+              <p className="text-gray-500 mb-6">
+                {myScore > partnerScore
+                  ? "You won! 🏆"
+                  : partnerScore > myScore
+                    ? `${partnerName || "Partner"} wins! 🏆`
+                    : "It's a tie! 🤝"}
               </p>
-              <p className="text-sm text-gray-500 mb-3">
-                {completed >= 4 ? "You two are amazing together! 💕" : "Keep going, have fun together! 🎉"}
-              </p>
-              <Button variant="outline" size="sm" onClick={() => { setCompleted(0); setSkipped(0); setHistory([]); }}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Start Over
-              </Button>
+              <div className="flex gap-3 justify-center">
+                <Button variant="outline" onClick={onBack}>Back to Games</Button>
+                <Button onClick={() => {
+                  setMyScore(0);
+                  setPartnerScore(0);
+                  setRound(1);
+                  setPhase("idle");
+                  setChallengeType(null);
+                  setSelectedQuestion(null);
+                  setLastResult(null);
+                }}>
+                  <RotateCcw className="h-4 w-4 mr-2" /> Play Again
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

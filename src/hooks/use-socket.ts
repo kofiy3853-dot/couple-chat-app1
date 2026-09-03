@@ -10,9 +10,14 @@ interface UseSocketOptions {
   onNewMessage?: (message: unknown) => void;
   onMessageDeleted?: (messageId: string) => void;
   onMessageEdited?: (data: { messageId: string; content: string; editedBy: string }) => void;
+  onGameChallengeReceived?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
+  onGameChoiceMade?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
+  onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => void;
+  onGameAnswerResult?: (data: { fromUserId: string; fromUserName: string; completed: boolean }) => void;
+  onGameEnded?: (data: { fromUserId: string }) => void;
 }
 
-export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
   const [presenceState, setPresenceState] = useState<Record<string, PresenceStatus>>({});
@@ -22,18 +27,20 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   const onNewMessageRef = useRef(onNewMessage);
   const onMessageDeletedRef = useRef(onMessageDeleted);
   const onMessageEditedRef = useRef(onMessageEdited);
+  const onGameChallengeReceivedRef = useRef(onGameChallengeReceived);
+  const onGameChoiceMadeRef = useRef(onGameChoiceMade);
+  const onGameQuestionReceivedRef = useRef(onGameQuestionReceived);
+  const onGameAnswerResultRef = useRef(onGameAnswerResult);
+  const onGameEndedRef = useRef(onGameEnded);
 
-  useEffect(() => {
-    onNewMessageRef.current = onNewMessage;
-  }, [onNewMessage]);
-
-  useEffect(() => {
-    onMessageDeletedRef.current = onMessageDeleted;
-  }, [onMessageDeleted]);
-
-  useEffect(() => {
-    onMessageEditedRef.current = onMessageEdited;
-  }, [onMessageEdited]);
+  useEffect(() => { onNewMessageRef.current = onNewMessage; }, [onNewMessage]);
+  useEffect(() => { onMessageDeletedRef.current = onMessageDeleted; }, [onMessageDeleted]);
+  useEffect(() => { onMessageEditedRef.current = onMessageEdited; }, [onMessageEdited]);
+  useEffect(() => { onGameChallengeReceivedRef.current = onGameChallengeReceived; }, [onGameChallengeReceived]);
+  useEffect(() => { onGameChoiceMadeRef.current = onGameChoiceMade; }, [onGameChoiceMade]);
+  useEffect(() => { onGameQuestionReceivedRef.current = onGameQuestionReceived; }, [onGameQuestionReceived]);
+  useEffect(() => { onGameAnswerResultRef.current = onGameAnswerResult; }, [onGameAnswerResult]);
+  useEffect(() => { onGameEndedRef.current = onGameEnded; }, [onGameEnded]);
 
   useEffect(() => {
     conversationIdRef.current = conversationId;
@@ -114,6 +121,26 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onMessageEditedRef.current?.(data);
     });
 
+    const unsubGameChallenge = client.on("game-challenge-received", (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+      onGameChallengeReceivedRef.current?.(data);
+    });
+
+    const unsubGameChoice = client.on("game-choice-made", (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+      onGameChoiceMadeRef.current?.(data);
+    });
+
+    const unsubGameQuestion = client.on("game-question-received", (data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => {
+      onGameQuestionReceivedRef.current?.(data);
+    });
+
+    const unsubGameAnswer = client.on("game-answer-result", (data: { fromUserId: string; fromUserName: string; completed: boolean }) => {
+      onGameAnswerResultRef.current?.(data);
+    });
+
+    const unsubGameEnded = client.on("game-ended", (data: { fromUserId: string }) => {
+      onGameEndedRef.current?.(data);
+    });
+
     client.connect();
 
     return () => {
@@ -131,6 +158,11 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       unsubNewMessage();
       unsubMessageDeleted();
       unsubMessageEdited();
+      unsubGameChallenge();
+      unsubGameChoice();
+      unsubGameQuestion();
+      unsubGameAnswer();
+      unsubGameEnded();
       Object.values(typingTimers.current).forEach(clearTimeout);
 
       if (conversationIdRef.current) {
@@ -235,6 +267,42 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
+  // ─── Game methods ──────────────────────────────────────────────────────
+  const startGame = useCallback(
+    (conversationId: string, type: "truth" | "dare") => {
+      clientRef.current?.startGame(conversationId, type);
+    },
+    []
+  );
+
+  const makeChoice = useCallback(
+    (conversationId: string, type: "truth" | "dare") => {
+      clientRef.current?.makeChoice(conversationId, type);
+    },
+    []
+  );
+
+  const sendQuestion = useCallback(
+    (conversationId: string, question: string, type: "truth" | "dare") => {
+      clientRef.current?.sendQuestion(conversationId, question, type);
+    },
+    []
+  );
+
+  const sendAnswer = useCallback(
+    (conversationId: string, completed: boolean) => {
+      clientRef.current?.sendAnswer(conversationId, completed);
+    },
+    []
+  );
+
+  const endGame = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.endGame(conversationId);
+    },
+    []
+  );
+
   return {
     connected,
     typingState,
@@ -251,5 +319,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     deleteMessage,
     editMessage,
     markAsRead,
+    startGame,
+    makeChoice,
+    sendQuestion,
+    sendAnswer,
+    endGame,
   };
 }
