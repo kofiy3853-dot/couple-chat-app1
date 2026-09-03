@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UnauthorizedError, AppError, ValidationError } from "./errors";
+import { auth } from "./auth";
 
 export interface AuthUser {
   id: string;
@@ -60,15 +61,17 @@ export function paginateResponse<T>(
   });
 }
 
-// Demo mode: return hardcoded user
+// Get current user from session
 export async function getCurrentUser(): Promise<AuthUser | null> {
+  const session = await auth();
+  if (!session?.user?.id) return null;
   return {
-    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    name: "Naomi",
-    email: "naomi@example.com",
-    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Naomi",
-    username: "naomi",
-    role: "USER",
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
+    username: (session.user as Record<string, unknown>).username as string | null,
+    role: (session.user as Record<string, unknown>).role as string | null,
   };
 }
 

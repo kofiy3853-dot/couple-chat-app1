@@ -56,6 +56,15 @@ const MEMBER_MICKY_ID = "00000000-0000-0000-0000-000000000014";
 async function main() {
   console.log("🌱 Seeding database...\n");
 
+  // Skip if already seeded
+  const existing = await prisma.user.findFirst({
+    where: { email: "naomi@example.com" },
+  });
+  if (existing) {
+    console.log("✅ Database already seeded, skipping.");
+    return;
+  }
+
   // ── Users ─────────────────────────────────────────────────────────────────
 
   const naomi = await prisma.user.upsert({
