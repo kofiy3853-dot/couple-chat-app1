@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export function HeroSection() {
+  const { data: session, status } = useSession();
+  const isLoading = status === "loading";
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-background via-background to-background-secondary">
       {/* Background decoration */}
@@ -65,21 +68,42 @@ export function HeroSection() {
 
         {/* CTA Buttons */}
         <div className="animate-slide-up delay-400 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all duration-200 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
-          >
-            Start Demo
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
-          </Link>
-          <Link
-            href="/chat"
-            className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-transparent text-foreground font-medium rounded-lg border border-border hover:border-foreground/20 hover:bg-foreground/5 transition-all duration-200"
-          >
-            Open Chat
-          </Link>
+          {isLoading ? (
+            <div className="h-12 w-32 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
+          ) : session?.user ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all duration-200 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
+              >
+                Go to Dashboard
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </Link>
+              <Link
+                href="/chat"
+                className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-transparent text-foreground font-medium rounded-lg border border-border hover:border-foreground/20 hover:bg-foreground/5 transition-all duration-200"
+              >
+                Open Chat
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all duration-200 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-transparent text-foreground font-medium rounded-lg border border-border hover:border-foreground/20 hover:bg-foreground/5 transition-all duration-200"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </section>
