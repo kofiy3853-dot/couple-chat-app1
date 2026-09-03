@@ -57,12 +57,20 @@ const MEMBER_MICKY_ID = "00000000-0000-0000-0000-000000000014";
 async function main() {
   console.log("🌱 Seeding database...\n");
 
-  // Skip if already seeded
+  // Skip if already seeded, but update passwords just in case!
   const existing = await prisma.user.findFirst({
     where: { email: "naomi@example.com" },
   });
   if (existing) {
-    console.log("✅ Database already seeded, skipping.");
+    console.log("✅ Database already seeded, updating passwords and skipping the rest.");
+    await prisma.user.update({
+      where: { email: "naomi@example.com" },
+      data: { password: await hash("Naomi@123", 10) },
+    });
+    await prisma.user.update({
+      where: { email: "micky@example.com" },
+      data: { password: await hash("Nharnah@12", 10) },
+    });
     return;
   }
 
