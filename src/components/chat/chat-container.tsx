@@ -10,6 +10,7 @@ import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
 import { TypingIndicator } from "./typing-indicator";
 import { EmptyChat } from "./empty-chat";
+import { NoCoupleView } from "@/components/dashboard/no-couple-view";
 import { cn } from "@/lib/utils";
 
 interface CoupleData {
@@ -141,7 +142,15 @@ export function ChatContainer({ className }: ChatContainerProps) {
     );
   }
 
-  if (!couple || !partnerUser || !conversationId) {
+  if (!couple) {
+    return (
+      <div className={cn("flex flex-col h-full bg-gray-50/50 dark:bg-gray-950/50 p-4 md:p-8 overflow-y-auto", className)}>
+        <NoCoupleView userName={currentUser?.name?.split(" ")[0] || "there"} />
+      </div>
+    );
+  }
+
+  if (!partnerUser || !conversationId) {
     return (
       <div className={cn("flex flex-col h-full bg-white dark:bg-gray-950", className)}>
         <EmptyChat />
