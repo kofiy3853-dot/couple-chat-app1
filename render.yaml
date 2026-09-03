@@ -12,6 +12,8 @@ services:
         fromDatabase:
           name: couple-chat-db
           property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
       - key: NEXT_PUBLIC_APP_URL
         value: https://couple-chat-web.onrender.com
       - key: NEXT_PUBLIC_WS_URL
