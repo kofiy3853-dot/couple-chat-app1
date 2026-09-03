@@ -20,7 +20,7 @@ export default async function DashboardPage() {
                       id: true,
                       name: true,
                       image: true,
-                      lastSeenAt: true,
+
                     },
                   },
                 },
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
       partner={{
         name: partner.name,
         image: partner.image,
-        lastSeenAt: partner.lastSeenAt?.toISOString() || null,
+
       }}
       daysTogether={daysTogether}
       messageCount={messageCount}

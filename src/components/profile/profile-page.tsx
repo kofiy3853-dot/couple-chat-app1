@@ -20,7 +20,7 @@ interface Profile {
   bio: string | null;
   role: string;
   status: string;
-  lastSeenAt: string | null;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -192,11 +192,11 @@ export function ProfilePage() {
               {format(new Date(profile.createdAt), "MMM d, yyyy")}
             </span>
           </div>
-          {profile.lastSeenAt && (
+          {false && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">Last seen</span>
               <span className="text-sm text-gray-900 dark:text-gray-100">
-                {format(new Date(profile.lastSeenAt), "MMM d, yyyy h:mm a")}
+                {format(new Date(), "MMM d, yyyy h:mm a")}
               </span>
             </div>
           )}

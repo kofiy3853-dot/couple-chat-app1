@@ -21,7 +21,7 @@ import { NotificationsPreview } from "./notifications-preview";
 interface Partner {
   name: string | null;
   image: string | null;
-  lastSeenAt: string | null;
+
 }
 
 interface Message {

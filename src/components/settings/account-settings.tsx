@@ -28,7 +28,7 @@ interface Profile {
   bio: string | null;
   role: string;
   status: string;
-  lastSeenAt: string | null;
+
   createdAt: string;
   updatedAt: string;
 }

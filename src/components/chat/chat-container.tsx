@@ -21,7 +21,7 @@ interface CoupleData {
       email: string;
       image: string | null;
       bio: string | null;
-      lastSeenAt: string | null;
+
     };
   }[];
   conversation: {
@@ -166,7 +166,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
         partnerName={partnerUser.name ?? partnerUser.username ?? "Partner"}
         partnerImage={partnerUser.image}
         isOnline={isPartnerOnline}
-        lastSeen={partnerUser.lastSeenAt}
+        lastSeen={null}
       />
 
       <MessageList

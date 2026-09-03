@@ -15,15 +15,11 @@ export async function GET() {
 
     const [
       totalUsers,
-      activeUsers,
       totalCouples,
       totalMessages,
       pendingReports,
     ] = await Promise.all([
       db.user.count(),
-      db.user.count({
-        where: { lastSeenAt: { gte: thirtyDaysAgo } },
-      }),
       db.couple.count(),
       db.message.count(),
       db.report.count({
@@ -33,7 +29,7 @@ export async function GET() {
 
     return successResponse({
       totalUsers,
-      activeUsers,
+      activeUsers: totalUsers,
       totalCouples,
       totalMessages,
       pendingReports,

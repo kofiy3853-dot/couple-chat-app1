@@ -22,7 +22,7 @@ export async function GET() {
                     email: true,
                     image: true,
                     bio: true,
-                    lastSeenAt: true,
+
                   },
                 },
               },

@@ -21,7 +21,7 @@ export async function GET() {
         bio: true,
         role: true,
         status: true,
-        lastSeenAt: true,
+
         createdAt: true,
         updatedAt: true,
       },

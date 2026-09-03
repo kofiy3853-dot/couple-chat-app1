@@ -25,7 +25,7 @@ interface User {
   role: string;
   status: string;
   createdAt: string;
-  lastSeenAt: string | null;
+
   _count: {
     coupleMembers: number;
     sentMessages: number;

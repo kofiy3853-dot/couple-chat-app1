@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           role: true,
           status: true,
           createdAt: true,
-          lastSeenAt: true,
+
           _count: {
             select: {
               coupleMembers: true,

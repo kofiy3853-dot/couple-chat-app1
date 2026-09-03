@@ -47,7 +47,7 @@ export async function GET(
       response.isOnline = false;
     }
     if (privacy?.showLastSeen) {
-      response.lastSeenAt = null;
+
     }
 
     return successResponse(response);
