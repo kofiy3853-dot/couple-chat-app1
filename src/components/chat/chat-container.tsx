@@ -39,7 +39,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
-  const { onlineUsers, typingUsers } = useChatStore();
+  const { onlineUsers } = useChatStore();
   const { data: session } = useSession();
   const currentUser = session?.user;
 
@@ -66,6 +66,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
 
   const {
     connected,
+    typingState,
     startTyping,
     stopTyping,
     markAsRead,
@@ -95,19 +96,21 @@ export function ChatContainer({ className }: ChatContainerProps) {
   }, [currentUser?.id]);
 
   const isPartnerOnline = partnerUser ? onlineUsers.has(partnerUser.id) : false;
-  const isPartnerTyping = partnerUser ? typingUsers.has(partnerUser.id) : false;
+  // Use typingState from useSocket (plain React state) — Zustand Set doesn't reliably trigger re-renders
+  const isPartnerTyping = partnerUser ? (typingState[partnerUser.id] === true) : false;
 
   const handleTyping = useCallback(() => {
-    if (connected && conversationId) {
+    // Send even if not connected — socket will queue or client is reconnecting
+    if (conversationId) {
       startTyping(conversationId);
     }
-  }, [conversationId, startTyping, connected]);
+  }, [conversationId, startTyping]);
 
   const handleStopTyping = useCallback(() => {
-    if (connected && conversationId) {
+    if (conversationId) {
       stopTyping(conversationId);
     }
-  }, [conversationId, stopTyping, connected]);
+  }, [conversationId, stopTyping]);
 
   const handleMarkRead = useCallback((lastMessageId: string) => {
     if (connected && conversationId) {

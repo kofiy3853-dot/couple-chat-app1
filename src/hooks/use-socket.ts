@@ -11,16 +11,32 @@ interface UseSocketOptions {
 
 export function useSocket({ conversationId, userId }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
+  // Use a plain state map instead of relying on Zustand Set for re-render reliability
+  const [typingState, setTypingState] = useState<Record<string, boolean>>({});
+  const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const clientRef = useRef<WebSocketClient | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const { addMessage, removeMessage, setTypingUser, setOnlineUser } = useChatStore();
 
+  // Keep conversationIdRef in sync for use inside callbacks
   useEffect(() => {
-    if (!userId) return; // Don't connect if we don't have a user yet
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!userId) return;
 
     const client = WebSocketClient.getInstance({ userId });
     clientRef.current = client;
 
-    const unsubConnected = client.on("connected", () => setConnected(true));
+    const unsubConnected = client.on("connected", () => {
+      setConnected(true);
+      // Join conversation only after confirmed connection (fixes race condition)
+      if (conversationIdRef.current) {
+        client.joinConversation(conversationIdRef.current);
+      }
+    });
+
     const unsubDisconnected = client.on("disconnected", () => setConnected(false));
 
     const unsubOnline = client.on("user-online", (data: { userId: string }) => {
@@ -32,15 +48,23 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
     });
 
     const unsubTypingStart = client.on("typing-start", (data: { userId: string }) => {
-      if (data.userId !== userId) {
-        setTypingUser(data.userId, true);
-      }
+      if (data.userId === userId) return;
+      // Update both local react state (for re-renders) and Zustand store
+      setTypingState((prev) => ({ ...prev, [data.userId]: true }));
+      setTypingUser(data.userId, true);
+      // Auto-clear after 3s in case stop event is dropped
+      if (typingTimers.current[data.userId]) clearTimeout(typingTimers.current[data.userId]);
+      typingTimers.current[data.userId] = setTimeout(() => {
+        setTypingState((prev) => ({ ...prev, [data.userId]: false }));
+        setTypingUser(data.userId, false);
+      }, 3000);
     });
 
     const unsubTypingStop = client.on("typing-stop", (data: { userId: string }) => {
-      if (data.userId !== userId) {
-        setTypingUser(data.userId, false);
-      }
+      if (data.userId === userId) return;
+      if (typingTimers.current[data.userId]) clearTimeout(typingTimers.current[data.userId]);
+      setTypingState((prev) => ({ ...prev, [data.userId]: false }));
+      setTypingUser(data.userId, false);
     });
 
     const unsubNewMessage = client.on("new-message", (message: unknown) => {
@@ -62,9 +86,10 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
       unsubTypingStop();
       unsubNewMessage();
       unsubMessageDeleted();
+      Object.values(typingTimers.current).forEach(clearTimeout);
 
-      if (conversationId) {
-        client.leaveConversation(conversationId);
+      if (conversationIdRef.current) {
+        client.leaveConversation(conversationIdRef.current);
       }
       client.disconnect();
       WebSocketClient.destroyInstance();
@@ -72,16 +97,15 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
     };
   }, [userId, addMessage, removeMessage, setTypingUser, setOnlineUser]);
 
+  // Re-join conversation when it changes (e.g. couple first connects)
   useEffect(() => {
     const client = clientRef.current;
-    if (!client || !conversationId) return;
-
+    if (!client || !conversationId || !connected) return;
     client.joinConversation(conversationId);
-
     return () => {
       client.leaveConversation(conversationId);
     };
-  }, [conversationId]);
+  }, [conversationId, connected]);
 
   const sendMessage = useCallback(
     (conversationId: string, content: string, type: "TEXT" | "IMAGE" = "TEXT") => {
@@ -134,6 +158,7 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
 
   return {
     connected,
+    typingState,
     sendMessage,
     startTyping,
     stopTyping,
