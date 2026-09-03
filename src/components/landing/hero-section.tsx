@@ -32,15 +32,15 @@ export function HeroSection() {
 
         {/* Heading */}
         <h1 className="animate-slide-up delay-100 text-5xl md:text-7xl font-bold text-foreground mb-6 tracking-tight">
-          Your private space
+          Naomi & Micky
           <br />
-          <span className="text-primary">for two</span>
+          <span className="text-primary">forever & always</span>
         </h1>
 
         {/* Tagline */}
         <p className="animate-slide-up delay-200 text-xl md:text-2xl text-foreground-muted mb-8 max-w-2xl mx-auto leading-relaxed">
-          A beautifully designed app for couples to chat, share memories, and
-          celebrate your journey together.
+          Your private little corner of the internet — just for the two of you.
+          Chat, share memories, and celebrate every moment together.
         </p>
 
         {/* Feature highlights */}

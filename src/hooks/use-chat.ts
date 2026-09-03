@@ -52,8 +52,29 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageIdRef = useRef<string | null>(null);
+
+  // Expose setters for WebSocket integration
+  const addRealtimeMessage = useCallback((message: Message) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === message.id)) return prev;
+      return [...prev, message];
+    });
+  }, []);
+
+  const markMessageDeleted = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, deletedAt: new Date().toISOString() }
+          : m
+      )
+    );
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
 
   const fetchMessages = useCallback(
     async (cursorParam?: string | null, prepend = false) => {
@@ -89,54 +110,11 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
     [conversationId]
   );
 
-  const pollMessages = useCallback(async () => {
-    if (!conversationId) return;
-
-    const params = new URLSearchParams({
-      conversationId,
-      limit: "50",
-    });
-
-    const res = await fetch(`/api/messages?${params.toString()}`);
-    const data = await res.json();
-
-    if (data.success) {
-      const result: MessagesResponse = data.data;
-      const latestMessages = result.messages;
-
-      setMessages((prev) => {
-        if (prev.length === 0) return latestMessages;
-
-        const prevIds = new Set(prev.map((m) => m.id));
-        const newMessages = latestMessages.filter((m: Message) => !prevIds.has(m.id));
-
-        if (newMessages.length === 0) return prev;
-
-        const updatedIds = new Set(newMessages.map((m) => m.id));
-        const kept = prev.filter((m) => !updatedIds.has(m.id));
-
-        return [...kept, ...newMessages];
-      });
-    }
-  }, [conversationId]);
-
-  // Initial fetch and polling setup
+  // Initial fetch only — real-time updates come via WebSocket
   useEffect(() => {
     if (!conversationId) return;
-
     fetchMessages(null, false);
-
-    pollRef.current = setInterval(() => {
-      pollMessages();
-    }, 3000);
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [conversationId, fetchMessages, pollMessages]);
+  }, [conversationId, fetchMessages]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !cursor) return;
@@ -250,6 +228,9 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
     deleteMessage,
     addReaction,
     removeReaction,
+    addRealtimeMessage,
+    markMessageDeleted,
+    clearMessages,
   };
 }
 

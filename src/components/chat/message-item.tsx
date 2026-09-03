@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { format } from "date-fns";
 import { Check, CheckCheck, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ReactionPicker } from "./reaction-picker";
@@ -33,7 +34,7 @@ function formatMessageTime(dateString: string): string {
   return format(date, "h:mm a");
 }
 
-export function MessageItem({
+function MessageItemInner({
   message,
   isOwn,
   currentUserId,
@@ -109,14 +110,17 @@ export function MessageItem({
               {!imageLoaded && (
                 <div className="w-48 h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
               )}
-              <img
+              <Image
                 src={imageUrl}
                 alt="Shared image"
+                width={280}
+                height={300}
                 className={cn(
                   "max-w-[280px] max-h-[300px] rounded-lg object-cover",
                   imageLoaded ? "block" : "hidden"
                 )}
                 onLoad={() => setImageLoaded(true)}
+                unoptimized
               />
             </div>
           ) : (
@@ -194,3 +198,14 @@ export function MessageItem({
     </div>
   );
 }
+
+export const MessageItem = memo(MessageItemInner, (prev, next) =>
+  prev.message.id === next.message.id &&
+  prev.message.content === next.message.content &&
+  prev.message.deletedAt === next.message.deletedAt &&
+  prev.message.reactions.length === next.message.reactions.length &&
+  prev.isOwn === next.isOwn &&
+  prev.isRead === next.isRead &&
+  prev.showAvatar === next.showAvatar &&
+  prev.currentUserId === next.currentUserId
+);

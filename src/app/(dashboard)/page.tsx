@@ -8,77 +8,80 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: {
-      coupleMembers: {
-        include: {
-          couple: {
-            include: {
-              members: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      image: true,
+  const userId = session.user.id;
 
-                    },
-                  },
-                },
-              },
-              conversation: {
-                include: {
-                  messages: {
-                    orderBy: { createdAt: "desc" },
-                    take: 5,
-                    include: {
-                      sender: {
-                        select: {
-                          id: true,
-                          name: true,
-                          image: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              memories: {
-                orderBy: { date: "desc" },
-                take: 4,
-              },
-            },
+  const [user, coupleMember] = await Promise.all([
+    db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+      },
+    }),
+    db.coupleMember.findFirst({
+      where: { userId },
+      include: {
+        couple: {
+          select: {
+            id: true,
+            anniversaryDate: true,
           },
         },
       },
-      notifications: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-    },
-  });
+    }),
+  ]);
 
   if (!user) {
-    // Should not happen in demo mode, but handle gracefully
     return <NoCoupleView userName="there" />;
   }
 
-  const coupleMember = user.coupleMembers[0];
   const couple = coupleMember?.couple;
-  const partner = couple?.members.find(
-    (m: { userId: string }) => m.userId !== user.id
-  )?.user;
-
-  if (!couple || !partner) {
+  if (!couple) {
     return <NoCoupleView userName={user.name?.split(" ")[0] || "there"} />;
   }
 
-  const messageCount = couple.conversation?.messages.length || 0;
-  const memoryCount = couple.memories.length || 0;
+  const [partnerMember, conversation, memories, notifications, messageCount] = await Promise.all([
+    db.coupleMember.findFirst({
+      where: { coupleId: couple.id, userId: { not: userId } },
+      include: {
+        user: {
+          select: { id: true, name: true, image: true },
+        },
+      },
+    }),
+    db.conversation.findUnique({
+      where: { coupleId: couple.id },
+      select: { id: true },
+    }),
+    db.memory.findMany({
+      where: { coupleId: couple.id },
+      orderBy: { date: "desc" },
+      take: 4,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        imageUrl: true,
+        date: true,
+      },
+    }),
+    db.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    conversation?.id
+      ? db.message.count({ where: { conversationId: conversation.id } })
+      : Promise.resolve(0),
+  ]);
+
+  const partner = partnerMember?.user;
+  if (!partner) {
+    return <NoCoupleView userName={user.name?.split(" ")[0] || "there"} />;
+  }
 
   const now = new Date();
-  
   let daysTogether = 0;
   if (couple.anniversaryDate) {
     daysTogether = Math.floor((now.getTime() - new Date(couple.anniversaryDate).getTime()) / (1000 * 60 * 60 * 24));
@@ -86,49 +89,40 @@ export default async function DashboardPage() {
     daysTogether = Math.floor((now.getTime() - new Date(coupleMember.joinedAt).getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  const recentMessages = (couple.conversation?.messages || []).map(
-    (msg: {
-      id: string;
-      content: string;
-      type: string;
-      createdAt: Date;
-      sender: { id: string; name: string | null; image: string | null };
-    }) => ({
-      ...msg,
-      createdAt: msg.createdAt.toISOString(),
-    })
-  );
+  const recentMessages = conversation?.id
+    ? (
+        await db.message.findMany({
+          where: { conversationId: conversation.id },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: {
+            sender: {
+              select: { id: true, name: true, image: true },
+            },
+          },
+        })
+      ).map((msg) => ({
+        ...msg,
+        createdAt: msg.createdAt.toISOString(),
+      }))
+    : [];
 
-  const recentMemories = couple.memories.map(
-    (mem: {
-      id: string;
-      title: string;
-      description: string | null;
-      imageUrl: string | null;
-      date: Date;
-    }) => ({
-      ...mem,
-      date: mem.date.toISOString(),
-    })
-  );
-
-  const unreadNotifications = user.notifications.length;
+  const recentMemories = memories.map((mem) => ({
+    ...mem,
+    date: mem.date.toISOString(),
+  }));
 
   return (
     <DashboardContent
       userName={user.name?.split(" ")[0] || "there"}
-      partner={{
-        name: partner.name,
-        image: partner.image,
-
-      }}
+      partner={{ name: partner.name, image: partner.image }}
       daysTogether={daysTogether}
       messageCount={messageCount}
-      memoryCount={memoryCount}
-      conversationId={couple.conversation?.id || null}
+      memoryCount={memories.length}
+      conversationId={conversation?.id || null}
       recentMessages={recentMessages}
       recentMemories={recentMemories}
-      unreadNotifications={unreadNotifications}
+      unreadNotifications={notifications.length}
       anniversaryDate={couple.anniversaryDate ? couple.anniversaryDate.toISOString() : null}
     />
   );

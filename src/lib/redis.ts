@@ -34,7 +34,6 @@ export async function expire(key: string, seconds: number): Promise<boolean> {
 }
 
 const ONLINE_PREFIX = "online:";
-const TYPING_PREFIX = "typing:";
 const RATE_LIMIT_PREFIX = "ratelimit:";
 const ONLINE_SET = "online_users";
 
@@ -58,16 +57,16 @@ export async function getOnlineUsers(): Promise<string[]> {
 }
 
 export async function setTyping(conversationId: string, userId: string): Promise<void> {
-  await redis.set(`${TYPING_PREFIX}${conversationId}:${userId}`, "1", "EX", 5);
+  await redis.sadd(`typing:${conversationId}`, userId);
+  await redis.expire(`typing:${conversationId}`, 5);
 }
 
 export async function removeTyping(conversationId: string, userId: string): Promise<void> {
-  await redis.del(`${TYPING_PREFIX}${conversationId}:${userId}`);
+  await redis.srem(`typing:${conversationId}`, userId);
 }
 
 export async function getTypingUsers(conversationId: string): Promise<string[]> {
-  const keys = await redis.keys(`${TYPING_PREFIX}${conversationId}:*`);
-  return keys.map((key) => key.split(":").pop()!);
+  return redis.smembers(`typing:${conversationId}`);
 }
 
 export async function checkRateLimit(

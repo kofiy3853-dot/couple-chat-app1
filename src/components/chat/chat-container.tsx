@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useChat } from "@/hooks/use-chat";
 import { useSocket } from "@/hooks/use-socket";
-import { useChatStore } from "@/stores/chat-store";
 import { useSession } from "next-auth/react";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
@@ -58,6 +57,9 @@ export function ChatContainer({ className }: ChatContainerProps) {
     sendMessage,
     deleteMessage,
     addReaction,
+    addRealtimeMessage,
+    markMessageDeleted,
+    clearMessages,
   } = useChat({
     conversationId,
     userId: currentUser?.id || "",
@@ -73,6 +75,8 @@ export function ChatContainer({ className }: ChatContainerProps) {
   } = useSocket({
     conversationId,
     userId: currentUser?.id || "",
+    onNewMessage: addRealtimeMessage,
+    onMessageDeleted: markMessageDeleted,
   });
 
   useEffect(() => {
@@ -122,9 +126,8 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const handleClearHistory = useCallback(async () => {
     if (!conversationId) return;
     await fetch(`/api/messages?conversationId=${conversationId}`, { method: "DELETE" });
-    // Clear local state immediately
-    window.location.reload();
-  }, [conversationId]);
+    clearMessages();
+  }, [conversationId, clearMessages]);
 
   const handleSend = useCallback(
     async (content: string) => {

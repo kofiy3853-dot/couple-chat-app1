@@ -2,24 +2,32 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import WebSocketClient from "@/server/websocket/client";
-import { useChatStore } from "@/stores/chat-store";
 
 interface UseSocketOptions {
   conversationId: string | null;
   userId: string;
+  onNewMessage?: (message: unknown) => void;
+  onMessageDeleted?: (messageId: string) => void;
 }
 
-export function useSocket({ conversationId, userId }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
-  // Plain React state for reliable re-renders (Zustand Set mutations don't trigger re-renders)
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
   const [onlineState, setOnlineState] = useState<Record<string, boolean>>({});
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const clientRef = useRef<WebSocketClient | null>(null);
   const conversationIdRef = useRef<string | null>(null);
-  const { addMessage, removeMessage, setTypingUser, setOnlineUser } = useChatStore();
+  const onNewMessageRef = useRef(onNewMessage);
+  const onMessageDeletedRef = useRef(onMessageDeleted);
 
-  // Keep conversationIdRef in sync for use inside callbacks
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+
+  useEffect(() => {
+    onMessageDeletedRef.current = onMessageDeleted;
+  }, [onMessageDeleted]);
+
   useEffect(() => {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
@@ -32,7 +40,6 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
 
     const unsubConnected = client.on("connected", () => {
       setConnected(true);
-      // Join conversation only after confirmed connection (fixes race condition)
       if (conversationIdRef.current) {
         client.joinConversation(conversationIdRef.current);
       }
@@ -42,32 +49,24 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
 
     const unsubOnline = client.on("user-online", (data: { userId: string }) => {
       setOnlineState((prev) => ({ ...prev, [data.userId]: true }));
-      setOnlineUser(data.userId, true);
     });
 
     const unsubOffline = client.on("user-offline", (data: { userId: string }) => {
       setOnlineState((prev) => ({ ...prev, [data.userId]: false }));
-      setOnlineUser(data.userId, false);
     });
 
-    // Server sends this snapshot of all currently-online users when we first connect
     const unsubSnapshot = client.on("online-users-snapshot", (data: { userIds: string[] }) => {
       const snapshot: Record<string, boolean> = {};
       data.userIds.forEach((id) => { snapshot[id] = true; });
       setOnlineState(snapshot);
-      data.userIds.forEach((id) => setOnlineUser(id, true));
     });
 
     const unsubTypingStart = client.on("typing-start", (data: { userId: string }) => {
       if (data.userId === userId) return;
-      // Update both local react state (for re-renders) and Zustand store
       setTypingState((prev) => ({ ...prev, [data.userId]: true }));
-      setTypingUser(data.userId, true);
-      // Auto-clear after 3s in case stop event is dropped
       if (typingTimers.current[data.userId]) clearTimeout(typingTimers.current[data.userId]);
       typingTimers.current[data.userId] = setTimeout(() => {
         setTypingState((prev) => ({ ...prev, [data.userId]: false }));
-        setTypingUser(data.userId, false);
       }, 3000);
     });
 
@@ -75,15 +74,14 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
       if (data.userId === userId) return;
       if (typingTimers.current[data.userId]) clearTimeout(typingTimers.current[data.userId]);
       setTypingState((prev) => ({ ...prev, [data.userId]: false }));
-      setTypingUser(data.userId, false);
     });
 
     const unsubNewMessage = client.on("new-message", (message: unknown) => {
-      addMessage(message as Parameters<typeof addMessage>[0]);
+      onNewMessageRef.current?.(message);
     });
 
     const unsubMessageDeleted = client.on("message-deleted", (data: { messageId: string }) => {
-      removeMessage(data.messageId);
+      onMessageDeletedRef.current?.(data.messageId);
     });
 
     client.connect();
@@ -107,9 +105,8 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
       WebSocketClient.destroyInstance();
       setConnected(false);
     };
-  }, [userId, addMessage, removeMessage, setTypingUser, setOnlineUser]);
+  }, [userId]);
 
-  // Re-join conversation when it changes (e.g. couple first connects)
   useEffect(() => {
     const client = clientRef.current;
     if (!client || !conversationId || !connected) return;
