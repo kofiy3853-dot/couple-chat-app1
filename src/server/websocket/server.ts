@@ -89,7 +89,7 @@ async function setOffline(userId: string) {
 }
 
 // ─── Connection handling ─────────────────────────────────────────────────────
-io.on("connection", (socket: AuthenticatedSocket) => {
+io.on("connection", async (socket: AuthenticatedSocket) => {
   const userId = socket.userId!;
   const userName = socket.userName!;
 
@@ -104,8 +104,21 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   socket.join(`user:${userId}`);
 
   // Mark online & broadcast
-  setOnline(userId);
+  await setOnline(userId);
   socket.broadcast.emit("user-online", { userId, userName });
+
+  // Send snapshot of currently online users to the newly connected client
+  let currentlyOnline: string[] = [];
+  try {
+    if (pubClient) {
+      currentlyOnline = await pubClient.smembers("online_users");
+    } else {
+      currentlyOnline = Array.from(onlineUsers.keys());
+    }
+  } catch {
+    currentlyOnline = Array.from(onlineUsers.keys());
+  }
+  socket.emit("online-users-snapshot", { userIds: currentlyOnline });
 
   // ─── Join conversation ──────────────────────────────────────────────────
   socket.on("join-conversation", async (data: { conversationId: string }) => {

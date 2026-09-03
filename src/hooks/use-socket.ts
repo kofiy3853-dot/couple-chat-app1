@@ -11,8 +11,9 @@ interface UseSocketOptions {
 
 export function useSocket({ conversationId, userId }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
-  // Use a plain state map instead of relying on Zustand Set for re-render reliability
+  // Plain React state for reliable re-renders (Zustand Set mutations don't trigger re-renders)
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
+  const [onlineState, setOnlineState] = useState<Record<string, boolean>>({});
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const clientRef = useRef<WebSocketClient | null>(null);
   const conversationIdRef = useRef<string | null>(null);
@@ -40,11 +41,21 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
     const unsubDisconnected = client.on("disconnected", () => setConnected(false));
 
     const unsubOnline = client.on("user-online", (data: { userId: string }) => {
+      setOnlineState((prev) => ({ ...prev, [data.userId]: true }));
       setOnlineUser(data.userId, true);
     });
 
     const unsubOffline = client.on("user-offline", (data: { userId: string }) => {
+      setOnlineState((prev) => ({ ...prev, [data.userId]: false }));
       setOnlineUser(data.userId, false);
+    });
+
+    // Server sends this snapshot of all currently-online users when we first connect
+    const unsubSnapshot = client.on("online-users-snapshot", (data: { userIds: string[] }) => {
+      const snapshot: Record<string, boolean> = {};
+      data.userIds.forEach((id) => { snapshot[id] = true; });
+      setOnlineState(snapshot);
+      data.userIds.forEach((id) => setOnlineUser(id, true));
     });
 
     const unsubTypingStart = client.on("typing-start", (data: { userId: string }) => {
@@ -82,6 +93,7 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
       unsubDisconnected();
       unsubOnline();
       unsubOffline();
+      unsubSnapshot();
       unsubTypingStart();
       unsubTypingStop();
       unsubNewMessage();
@@ -159,6 +171,7 @@ export function useSocket({ conversationId, userId }: UseSocketOptions) {
   return {
     connected,
     typingState,
+    onlineState,
     sendMessage,
     startTyping,
     stopTyping,

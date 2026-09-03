@@ -39,7 +39,6 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
-  const { onlineUsers } = useChatStore();
   const { data: session } = useSession();
   const currentUser = session?.user;
 
@@ -67,6 +66,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const {
     connected,
     typingState,
+    onlineState,
     startTyping,
     stopTyping,
     markAsRead,
@@ -94,8 +94,8 @@ export function ChatContainer({ className }: ChatContainerProps) {
       fetchCouple();
     }
   }, [currentUser?.id]);
-
-  const isPartnerOnline = partnerUser ? onlineUsers.has(partnerUser.id) : false;
+  // Use onlineState from useSocket (plain React state) — Zustand Set doesn't reliably trigger re-renders
+  const isPartnerOnline = partnerUser ? (onlineState[partnerUser.id] === true) : false;
   // Use typingState from useSocket (plain React state) — Zustand Set doesn't reliably trigger re-renders
   const isPartnerTyping = partnerUser ? (typingState[partnerUser.id] === true) : false;
 
