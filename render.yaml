@@ -16,6 +16,12 @@ services:
         value: https://couple-chat-web.onrender.com
       - key: NEXT_PUBLIC_WS_URL
         value: https://couple-chat-ws.onrender.com
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
   - type: web
     name: couple-chat-ws

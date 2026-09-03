@@ -38,6 +38,7 @@ interface ChatContainerProps {
 export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
   const { onlineUsers, typingUsers } = useChatStore();
   const { data: session } = useSession();
   const currentUser = session?.user;
@@ -67,6 +68,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
     connected,
     startTyping,
     stopTyping,
+    markAsRead,
   } = useSocket({
     conversationId,
     userId: currentUser?.id || "",
@@ -100,6 +102,26 @@ export function ChatContainer({ className }: ChatContainerProps) {
       startTyping(conversationId);
     }
   }, [conversationId, startTyping, connected]);
+
+  const handleStopTyping = useCallback(() => {
+    if (connected && conversationId) {
+      stopTyping(conversationId);
+    }
+  }, [conversationId, stopTyping, connected]);
+
+  const handleMarkRead = useCallback((lastMessageId: string) => {
+    if (connected && conversationId) {
+      markAsRead(conversationId, lastMessageId);
+    }
+    setLastReadMessageId(lastMessageId);
+  }, [connected, conversationId, markAsRead]);
+
+  const handleClearHistory = useCallback(async () => {
+    if (!conversationId) return;
+    await fetch(`/api/messages?conversationId=${conversationId}`, { method: "DELETE" });
+    // Clear local state immediately
+    window.location.reload();
+  }, [conversationId]);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -164,6 +186,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
         partnerImage={partnerUser.image}
         isOnline={isPartnerOnline}
         lastSeen={null}
+        onClearHistory={handleClearHistory}
       />
 
       <MessageList
@@ -173,9 +196,11 @@ export function ChatContainer({ className }: ChatContainerProps) {
         loadingMore={loadingMore}
         hasMore={hasMore}
         partnerName={partnerUser.name ?? partnerUser.username ?? undefined}
+        lastReadMessageId={lastReadMessageId}
         onLoadMore={loadMore}
         onDelete={handleDelete}
         onReaction={handleReaction}
+        onMarkRead={handleMarkRead}
       />
 
       <TypingIndicator
@@ -186,6 +211,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
       <MessageInput
         onSend={handleSend}
         onTyping={handleTyping}
+        onStopTyping={handleStopTyping}
         sending={sending}
         conversationId={conversationId}
       />

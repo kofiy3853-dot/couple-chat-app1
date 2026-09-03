@@ -3,16 +3,18 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Paperclip, Smile, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const QUICK_EMOJIS = [
   "❤️", "😍", "🥰", "😘", "💕", "🌹",
-  "😊", "😂", "🤗", "😘", "🥰", "💀",
+  "😊", "😂", "🤗", "😭", "🥹", "💀",
   "👍", "🙌", "👏", "🔥", "✨", "🎉",
 ];
 
 interface MessageInputProps {
   onSend: (content: string) => void;
   onTyping?: () => void;
+  onStopTyping?: () => void;
   disabled?: boolean;
   sending?: boolean;
   conversationId?: string;
@@ -22,6 +24,7 @@ interface MessageInputProps {
 export function MessageInput({
   onSend,
   onTyping,
+  onStopTyping,
   disabled = false,
   sending = false,
   conversationId,
@@ -36,6 +39,7 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingActiveRef = useRef(false);
+  const { toast } = useToast();
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -50,6 +54,13 @@ export function MessageInput({
 
   const handleSend = useCallback(async () => {
     if ((!content.trim() && !uploadFile) || sending) return;
+
+    // Stop typing indicator when sending
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (typingActiveRef.current) {
+      typingActiveRef.current = false;
+      onStopTyping?.();
+    }
 
     if (uploadFile && conversationId) {
       setUploading(true);
@@ -69,10 +80,14 @@ export function MessageInput({
           const formData = new FormData();
           formData.append("file", uploadFile);
           formData.append("messageId", messageId);
-          await fetch("/api/attachments", { method: "POST", body: formData });
+          const attachRes = await fetch("/api/attachments", { method: "POST", body: formData });
+          if (!attachRes.ok) {
+            const err = await attachRes.json();
+            toast({ title: "Upload failed", description: err?.error?.message || "Could not upload image", variant: "destructive" });
+          }
         }
       } catch {
-        // ignore
+        toast({ title: "Upload failed", description: "Network error, please try again", variant: "destructive" });
       } finally {
         setUploading(false);
         setUploadFile(null);
@@ -88,7 +103,7 @@ export function MessageInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [content, uploadFile, sending, onSend, conversationId]);
+  }, [content, uploadFile, sending, onSend, onStopTyping, conversationId, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -101,16 +116,15 @@ export function MessageInput({
     setContent(e.target.value);
 
     if (onTyping && conversationId) {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (!typingActiveRef.current) {
         typingActiveRef.current = true;
+        onTyping();
       }
       typingTimeoutRef.current = setTimeout(() => {
         typingActiveRef.current = false;
+        onStopTyping?.();
       }, 2000);
-      onTyping();
     }
   };
 
@@ -125,14 +139,14 @@ export function MessageInput({
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert("File must be 10MB or smaller");
+      toast({ title: "File too large", description: "Image must be 10MB or smaller", variant: "destructive" });
       e.target.value = "";
       return;
     }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      alert("Only JPEG, PNG, GIF, and WebP images are allowed");
+      toast({ title: "Invalid file type", description: "Only JPEG, PNG, GIF, and WebP images are allowed", variant: "destructive" });
       e.target.value = "";
       return;
     }

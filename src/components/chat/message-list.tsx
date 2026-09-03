@@ -15,9 +15,11 @@ interface MessageListProps {
   loadingMore: boolean;
   hasMore: boolean;
   partnerName?: string;
+  lastReadMessageId?: string | null;
   onLoadMore?: () => void;
   onDelete?: (messageId: string) => void;
   onReaction?: (messageId: string, emoji: string) => void;
+  onMarkRead?: (lastMessageId: string) => void;
 }
 
 function getDateLabel(dateString: string): string {
@@ -53,9 +55,11 @@ export function MessageList({
   loadingMore,
   hasMore,
   partnerName,
+  lastReadMessageId,
   onLoadMore,
   onDelete,
   onReaction,
+  onMarkRead,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -90,6 +94,15 @@ export function MessageList({
     }
     prevMessageCountRef.current = messages.length;
   }, [messages.length, shouldAutoScroll]);
+
+  // Mark messages as read when scrolled to bottom
+  useEffect(() => {
+    if (!onMarkRead || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.senderId !== currentUserId && shouldAutoScroll) {
+      onMarkRead(lastMsg.id);
+    }
+  }, [messages, currentUserId, shouldAutoScroll, onMarkRead]);
 
   useEffect(() => {
     if (hasMessages && !loading) {
@@ -173,7 +186,9 @@ export function MessageList({
                   key={message.id}
                   message={message}
                   isOwn={isOwn}
+                  currentUserId={currentUserId}
                   showAvatar={showAvatar}
+                  isRead={isOwn && message.id === lastReadMessageId}
                   onDelete={onDelete}
                   onReaction={onReaction}
                 />

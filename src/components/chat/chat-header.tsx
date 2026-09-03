@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, MoreVertical, Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, MoreVertical, Settings, Trash2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ interface ChatHeaderProps {
   isOnline?: boolean;
   lastSeen?: string | null;
   onBack?: () => void;
+  onClearHistory?: () => void;
   className?: string;
 }
 
@@ -54,8 +56,10 @@ export function ChatHeader({
   isOnline = false,
   lastSeen,
   onBack,
+  onClearHistory,
   className,
 }: ChatHeaderProps) {
+  const router = useRouter();
   return (
     <div
       className={cn(
@@ -109,14 +113,24 @@ export function ChatHeader({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/settings")}>
             <Settings className="h-4 w-4 mr-2" />
             Chat Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-red-600 focus:text-red-600">
-            Clear Chat History
-          </DropdownMenuItem>
+          {onClearHistory && (
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => {
+                if (confirm("Clear all chat history? This cannot be undone.")) {
+                  onClearHistory();
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Chat History
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

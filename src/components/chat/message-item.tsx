@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { Check, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Trash2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ReactionPicker } from "./reaction-picker";
@@ -11,7 +11,9 @@ import type { Message } from "@/hooks/use-chat";
 interface MessageItemProps {
   message: Message;
   isOwn: boolean;
+  currentUserId: string;
   showAvatar?: boolean;
+  isRead?: boolean;
   onDelete?: (messageId: string) => void;
   onReaction?: (messageId: string, emoji: string) => void;
 }
@@ -34,7 +36,9 @@ function formatMessageTime(dateString: string): string {
 export function MessageItem({
   message,
   isOwn,
+  currentUserId,
   showAvatar = false,
+  isRead = false,
   onDelete,
   onReaction,
 }: MessageItemProps) {
@@ -51,6 +55,9 @@ export function MessageItem({
       acc[reaction.emoji] = { count: [], hasOwn: false };
     }
     acc[reaction.emoji].count.push(reaction.userId);
+    if (reaction.userId === currentUserId) {
+      acc[reaction.emoji].hasOwn = true;
+    }
     return acc;
   }, {});
 
@@ -128,8 +135,12 @@ export function MessageItem({
           </span>
 
           {isOwn && !isDeleted && (
-            <span className="text-rose-400">
-              <Check className="h-3 w-3" />
+            <span className={isRead ? "text-rose-400" : "text-gray-400"}>
+              {isRead ? (
+                <CheckCheck className="h-3.5 w-3.5" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
             </span>
           )}
         </div>

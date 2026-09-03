@@ -193,3 +193,34 @@ export async function POST(request: NextRequest) {
     return errorResponse(error);
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireAuth();
+    const { searchParams } = new URL(request.url);
+    const conversationId = searchParams.get("conversationId");
+
+    if (!conversationId) {
+      return errorResponse(new ValidationError("conversationId is required", { conversationId: ["Required"] }));
+    }
+
+    const conversation = await db.conversation.findUnique({
+      where: { id: conversationId },
+      include: { couple: { include: { members: { select: { userId: true } } } } },
+    });
+
+    if (!conversation) throw new NotFoundError("Conversation not found");
+
+    const isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === user.id);
+    if (!isMember) throw new ForbiddenError("You are not a member of this conversation");
+
+    await db.message.updateMany({
+      where: { conversationId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+
+    return successResponse({ cleared: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
