@@ -13,6 +13,7 @@
 
 import { PrismaClient, MessageType, NotificationType } from "@prisma/client";
 import { v4 as uuid } from "uuid";
+import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -75,6 +76,7 @@ async function main() {
       name: "Naomi",
       email: "naomi@example.com",
       username: "naomi",
+      password: await hash("password123", 10),
       bio: "Love coffee, sunsets, and long walks on the beach ☕🌅",
       image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Naomi",
     },
@@ -89,6 +91,7 @@ async function main() {
       name: "Micky",
       email: "micky@example.com",
       username: "micky",
+      password: await hash("password123", 10),
       bio: "Music lover, amateur chef, dog dad 🎵👨‍🍳🐕",
       image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Micky",
     },

@@ -2,23 +2,27 @@ import { db } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
-
-// Demo users - using fixed UUIDs matching the seed
-const NAOMI_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-const MICKY_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-
-const DEMO_USERS = [
-  { id: NAOMI_ID, name: "Naomi", email: "naomi@example.com", username: "naomi", image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Naomi" },
-  { id: MICKY_ID, name: "Micky", email: "micky@example.com", username: "micky", image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Micky" },
-];
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // In demo mode, default to Naomi as the current user
-  const currentUser = DEMO_USERS[0];
+  const session = await auth();
+  
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const currentUser = await db.user.findUnique({
+    where: { id: session.user.id },
+  });
+
+  if (!currentUser) {
+    redirect("/login");
+  }
 
   const coupleMember = await db.coupleMember.findFirst({
     where: { userId: currentUser.id },

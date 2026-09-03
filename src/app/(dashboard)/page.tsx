@@ -1,13 +1,15 @@
 import { db } from "@/lib/db";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { NoCoupleView } from "@/components/dashboard/no-couple-view";
-
-// Demo mode - use Naomi's fixed UUID
-const NAOMI_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
   const user = await db.user.findUnique({
-    where: { id: NAOMI_ID },
+    where: { id: session.user.id },
     include: {
       coupleMembers: {
         include: {

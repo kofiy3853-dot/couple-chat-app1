@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useChat } from "@/hooks/use-chat";
 import { useSocket } from "@/hooks/use-socket";
 import { useChatStore } from "@/stores/chat-store";
-import { useDemoUserStore } from "@/stores/demo-user-store";
+import { useSession } from "next-auth/react";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
 import { TypingIndicator } from "./typing-indicator";
 import { EmptyChat } from "./empty-chat";
+import { cn } from "@/lib/utils";
 
 interface CoupleData {
   id: string;
@@ -37,10 +38,11 @@ export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const { onlineUsers, typingUsers } = useChatStore();
-  const { currentUser, partner, setPartner } = useDemoUserStore();
+  const { data: session } = useSession();
+  const currentUser = session?.user;
 
   const partnerUser = couple?.members.find(
-    (m) => m.user.id !== currentUser.id
+    (m) => m.user.id !== currentUser?.id
   )?.user;
 
   const conversationId = couple?.conversation?.id ?? null;
@@ -52,23 +54,22 @@ export function ChatContainer({ className }: ChatContainerProps) {
     hasMore,
     sending,
     loadMore,
-    sendMessage: httpSendMessage,
-    deleteMessage: httpDeleteMessage,
-    addReaction: httpAddReaction,
+    sendMessage,
+    deleteMessage,
+    addReaction,
   } = useChat({
     conversationId,
-    userId: currentUser.id,
+    userId: currentUser?.id || "",
   });
 
   const {
     connected,
-    sendMessage: wsSendMessage,
     startTyping,
     stopTyping,
   } = useSocket({
-    token: "",
+    token: "", // Will be replaced by real auth token when implemented
     conversationId,
-    userId: currentUser.id,
+    userId: currentUser?.id || "",
   });
 
   useEffect(() => {
@@ -78,12 +79,6 @@ export function ChatContainer({ className }: ChatContainerProps) {
         const data = await res.json();
         if (data.success) {
           setCouple(data.data);
-          if (data.data?.members) {
-            const partner = data.data.members.find(
-              (m: { user: { id: string } }) => m.user.id !== currentUser.id
-            )?.user;
-            if (partner) setPartner(partner);
-          }
         }
       } catch {
         // no-op
@@ -92,45 +87,39 @@ export function ChatContainer({ className }: ChatContainerProps) {
       }
     }
 
-    fetchCouple();
-  }, [currentUser.id, setPartner]);
+    if (currentUser?.id) {
+      fetchCouple();
+    }
+  }, [currentUser?.id]);
 
   const isPartnerOnline = partnerUser ? onlineUsers.has(partnerUser.id) : false;
   const isPartnerTyping = partnerUser ? typingUsers.has(partnerUser.id) : false;
 
   const handleTyping = useCallback(() => {
-    if (conversationId) {
+    if (connected && conversationId) {
       startTyping(conversationId);
     }
-  }, [conversationId, startTyping]);
+  }, [conversationId, startTyping, connected]);
 
   const handleSend = useCallback(
     async (content: string) => {
-      if (connected && conversationId) {
-        wsSendMessage(conversationId, content);
-      } else {
-        await httpSendMessage(content);
-      }
+      await sendMessage(content);
     },
-    [connected, conversationId, wsSendMessage, httpSendMessage]
+    [sendMessage]
   );
 
   const handleDelete = useCallback(
     async (messageId: string) => {
-      if (connected && conversationId) {
-        httpDeleteMessage(messageId);
-      } else {
-        await httpDeleteMessage(messageId);
-      }
+      await deleteMessage(messageId);
     },
-    [connected, conversationId, httpDeleteMessage]
+    [deleteMessage]
   );
 
   const handleReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      return httpAddReaction(messageId, emoji);
+      return addReaction(messageId, emoji);
     },
-    [httpAddReaction]
+    [addReaction]
   );
 
   if (loading) {
@@ -171,7 +160,7 @@ export function ChatContainer({ className }: ChatContainerProps) {
 
       <MessageList
         messages={messages}
-        currentUserId={currentUser.id}
+        currentUserId={currentUser?.id || ""}
         loading={messagesLoading}
         loadingMore={loadingMore}
         hasMore={hasMore}
@@ -194,8 +183,4 @@ export function ChatContainer({ className }: ChatContainerProps) {
       />
     </div>
   );
-}
-
-function cn(...classes: (string | undefined | false)[]) {
-  return classes.filter(Boolean).join(" ");
 }
