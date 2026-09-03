@@ -27,6 +27,11 @@ export async function GET() {
       },
     });
 
+    const coupleMember = await db.coupleMember.findFirst({
+      where: { userId: user.id },
+      include: { couple: { select: { anniversaryDate: true } } },
+    });
+
     return successResponse({
       profile,
       privacy: privacySetting ?? {
@@ -39,6 +44,9 @@ export async function GET() {
         reactionNotifications: privacySetting?.reactionNotifications ?? true,
         invitationNotifications: privacySetting?.invitationNotifications ?? true,
         memoryNotifications: privacySetting?.memoryNotifications ?? true,
+      },
+      couple: {
+        anniversaryDate: coupleMember?.couple.anniversaryDate ?? null,
       },
     });
   } catch (error) {
@@ -55,6 +63,7 @@ export async function PUT(request: NextRequest) {
       privacy?: { showOnlineStatus?: boolean; showLastSeen?: boolean; readReceipts?: boolean };
       profile?: { name?: string; bio?: string; image?: string };
       notifications?: { messageNotifications?: boolean; reactionNotifications?: boolean; invitationNotifications?: boolean; memoryNotifications?: boolean };
+      couple?: { anniversaryDate?: string | null };
     };
 
     const updates: Record<string, unknown> = {};
@@ -108,6 +117,18 @@ export async function PUT(request: NextRequest) {
           ...notificationData,
         },
       });
+    }
+
+    if (couple !== undefined) {
+      const coupleMember = await db.coupleMember.findFirst({
+        where: { userId: user.id },
+      });
+      if (coupleMember) {
+        await db.couple.update({
+          where: { id: coupleMember.coupleId },
+          data: { anniversaryDate: couple.anniversaryDate ? new Date(couple.anniversaryDate) : null },
+        });
+      }
     }
 
     return successResponse({ message: "Settings updated" });

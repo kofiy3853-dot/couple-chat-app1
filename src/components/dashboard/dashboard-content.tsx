@@ -17,6 +17,7 @@ import { RecentMessages } from "./recent-messages";
 import { MemoriesPreview } from "./memories-preview";
 import { TimelinePreview } from "./timeline-preview";
 import { NotificationsPreview } from "./notifications-preview";
+import { AnniversaryWidget } from "./anniversary-widget";
 
 interface Partner {
   name: string | null;
@@ -50,6 +51,7 @@ interface DashboardContentProps {
   recentMessages: Message[];
   recentMemories: Memory[];
   unreadNotifications: number;
+  anniversaryDate: string | null;
 }
 
 export function DashboardContent({
@@ -62,6 +64,7 @@ export function DashboardContent({
   recentMessages,
   recentMemories,
   unreadNotifications,
+  anniversaryDate,
 }: DashboardContentProps) {
   const partnerInitials = partner.name
     ?.split(" ")
@@ -93,9 +96,9 @@ export function DashboardContent({
               {userName} & {partner.name || "Partner"}
             </h1>
             {daysTogether !== null && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <p className="text-sm text-gray-500 flex items-center gap-1">
                 <Heart className="h-3 w-3 text-rose-400" fill="currentColor" />
-                Together for {daysTogether} {daysTogether === 1 ? "day" : "days"}
+                Together for {daysTogether.toLocaleString()} {daysTogether === 1 ? "day" : "days"}
               </p>
             )}
           </div>
@@ -135,8 +138,13 @@ export function DashboardContent({
         }
       />
 
+      <AnniversaryWidget 
+        daysTogether={daysTogether ?? 0} 
+        anniversaryDate={anniversaryDate} 
+      />
+
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <Card className="border-gray-200 dark:border-gray-800">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/20">
@@ -160,19 +168,6 @@ export function DashboardContent({
                 {memoryCount}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Memories</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200 dark:border-gray-800">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/20">
-              <Calendar className="h-5 w-5 text-rose-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {daysTogether ?? 0}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Days Together</p>
             </div>
           </CardContent>
         </Card>

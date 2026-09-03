@@ -35,13 +35,17 @@ interface Profile {
 
 interface AccountSettingsProps {
   profile: Profile;
+  couple?: { anniversaryDate: string | null };
   onUpdate: () => void;
 }
 
-export function AccountSettings({ profile, onUpdate }: AccountSettingsProps) {
+export function AccountSettings({ profile, couple, onUpdate }: AccountSettingsProps) {
   const [name, setName] = useState(profile?.name ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [image, setImage] = useState(profile?.image ?? "");
+  const [anniversaryDate, setAnniversaryDate] = useState(
+    couple?.anniversaryDate ? couple.anniversaryDate.split("T")[0] : ""
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -63,6 +67,7 @@ export function AccountSettings({ profile, onUpdate }: AccountSettingsProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile: { name, bio, image: image || undefined },
+          couple: { anniversaryDate: anniversaryDate || null },
         }),
       });
       const data = await res.json();
@@ -186,6 +191,25 @@ export function AccountSettings({ profile, onUpdate }: AccountSettingsProps) {
               rows={3}
             />
             <p className="text-xs text-gray-500">{bio.length}/500</p>
+          </div>
+
+          <Separator className="my-4" />
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium leading-none text-gray-900 dark:text-gray-100">Couple Settings</h3>
+            <div className="space-y-2">
+              <Label htmlFor="anniversaryDate">Anniversary Date</Label>
+              <Input
+                id="anniversaryDate"
+                type="date"
+                value={anniversaryDate}
+                onChange={(e) => setAnniversaryDate(e.target.value)}
+                className="w-full sm:max-w-[240px]"
+              />
+              <p className="text-xs text-gray-500">
+                This will be used for your dashboard countdown widget.
+              </p>
+            </div>
           </div>
 
           {message && (

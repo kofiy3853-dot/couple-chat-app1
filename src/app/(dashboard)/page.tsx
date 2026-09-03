@@ -78,12 +78,13 @@ export default async function DashboardPage() {
   const memoryCount = couple.memories.length || 0;
 
   const now = new Date();
-  const daysTogether = coupleMember?.joinedAt
-    ? Math.floor(
-        (now.getTime() - new Date(coupleMember.joinedAt).getTime()) /
-          (1000 * 60 * 60 * 24)
-      )
-    : null;
+  
+  let daysTogether = 0;
+  if (couple.anniversaryDate) {
+    daysTogether = Math.floor((now.getTime() - new Date(couple.anniversaryDate).getTime()) / (1000 * 60 * 60 * 24));
+  } else if (coupleMember?.joinedAt) {
+    daysTogether = Math.floor((now.getTime() - new Date(coupleMember.joinedAt).getTime()) / (1000 * 60 * 60 * 24));
+  }
 
   const recentMessages = (couple.conversation?.messages || []).map(
     (msg: {
@@ -128,6 +129,7 @@ export default async function DashboardPage() {
       recentMessages={recentMessages}
       recentMemories={recentMemories}
       unreadNotifications={unreadNotifications}
+      anniversaryDate={couple.anniversaryDate ? couple.anniversaryDate.toISOString() : null}
     />
   );
 }

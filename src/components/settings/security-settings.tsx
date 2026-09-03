@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,12 +25,9 @@ export function SecuritySettings() {
   async function handleLogoutAll() {
     setLoggingOut(true);
     try {
-      // Demo mode - just show message
-      setMessage("Demo mode: logout not available");
-      setLogoutAllDialogOpen(false);
+      await signOut({ callbackUrl: "/login" });
     } catch {
       setMessage("Failed to logout all sessions");
-    } finally {
       setLoggingOut(false);
     }
   }

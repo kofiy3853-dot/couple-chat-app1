@@ -2,7 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, Settings } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Bell, Settings, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -89,7 +90,7 @@ export function Header({ user }: HeaderProps) {
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
+          <DropdownMenuContent align="end" className="w-50">
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {user.name || "User"}
@@ -110,8 +111,12 @@ export function Header({ user }: HeaderProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600">
-              Demo Mode - No Logout
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="cursor-pointer text-red-600 focus:text-red-600"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

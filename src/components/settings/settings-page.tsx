@@ -27,6 +27,9 @@ interface SettingsData {
     showLastSeen: boolean;
     readReceipts: boolean;
   };
+  couple?: {
+    anniversaryDate: string | null;
+  };
 }
 
 export function SettingsPage() {
@@ -95,7 +98,11 @@ export function SettingsPage() {
         </TabsList>
 
         <TabsContent value="account">
-          <AccountSettings profile={settings.profile} onUpdate={fetchSettings} />
+          <AccountSettings 
+            profile={settings.profile} 
+            couple={settings.couple} 
+            onUpdate={fetchSettings} 
+          />
         </TabsContent>
 
         <TabsContent value="privacy">
