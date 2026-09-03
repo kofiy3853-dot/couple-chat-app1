@@ -23,7 +23,7 @@ class WebSocketClient {
   private _connected = false;
 
   constructor(options: WebSocketClientOptions = {}) {
-    this.url = options.url || process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+    this.url = options.url || process.env.NEXT_PUBLIC_WS_URL || "";
     this.userId = options.userId || "";
   }
 
@@ -51,6 +51,7 @@ class WebSocketClient {
     }
 
     this.socket = io(this.url, {
+      path: "/api/ws",
       transports: ["websocket", "polling"],
       reconnection: false,
       timeout: 10000,
@@ -153,7 +154,7 @@ class WebSocketClient {
   sendMessage(data: {
     conversationId: string;
     content: string;
-    type?: "TEXT" | "IMAGE";
+    type?: "TEXT" | "IMAGE" | "AUDIO";
     localId?: string;
   }): void {
     this.socket?.emit("send-message", data);
