@@ -4,7 +4,8 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
 import { db } from "@/lib/db";
 
-const PORT = parseInt(process.env.WS_PORT || "3001", 10);
+// Render passes the PORT environment variable dynamically for Web Services
+const PORT = parseInt(process.env.PORT || process.env.WS_PORT || "3001", 10);
 const REDIS_URL = process.env.REDIS_URL;
 
 const httpServer: HttpServer = new HttpServer();
@@ -299,7 +300,8 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 // ─── Start server ────────────────────────────────────────────────────────────
 async function start() {
   await setupRedisAdapter();
-  httpServer.listen(PORT, () => {
+  // Bind explicitly to 0.0.0.0 for Render/Docker compatibility
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`[WS] WebSocket server running on port ${PORT}`);
   });
 }
