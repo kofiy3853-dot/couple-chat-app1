@@ -7,7 +7,7 @@ type EventCallback = (...args: any[]) => void;
 
 interface WebSocketClientOptions {
   url?: string;
-  token: string;
+  token?: string;
 }
 
 class WebSocketClient {
@@ -18,15 +18,13 @@ class WebSocketClient {
   private maxReconnectAttempts = 10;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private url: string;
-  private token: string;
   private _connected = false;
 
-  constructor(options: WebSocketClientOptions) {
+  constructor(options: WebSocketClientOptions = {}) {
     this.url = options.url || process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
-    this.token = options.token;
   }
 
-  static getInstance(options: WebSocketClientOptions): WebSocketClient {
+  static getInstance(options: WebSocketClientOptions = {}): WebSocketClient {
     if (!WebSocketClient.instance) {
       WebSocketClient.instance = new WebSocketClient(options);
     }
@@ -41,9 +39,8 @@ class WebSocketClient {
     if (this.socket?.connected) return;
 
     this.socket = io(this.url, {
-      auth: { token: this.token },
       transports: ["websocket", "polling"],
-      reconnection: false, // We handle reconnection manually
+      reconnection: false,
       timeout: 10000,
     });
 

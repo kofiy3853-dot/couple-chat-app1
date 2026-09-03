@@ -2,18 +2,17 @@
  * Prisma Seed File — Couple Chat Application
  *
  * This file populates the database with development/demo data:
- *   - 3 users (admin, alice, bob)
- *   - 1 couple (Alice + Bob)
- *   - 1 conversation with 10+ messages
+ *   - 2 users (Naomi, Micky)
+ *   - 1 couple (Naomi + Micky)
+ *   - 1 conversation with messages
  *   - Example memories, timeline events, notifications
  *   - Privacy settings for all users
  *
  * Run with: npx prisma db seed
  */
 
-import { PrismaClient, UserRole, MessageType, NotificationType } from "@prisma/client";
+import { PrismaClient, MessageType, NotificationType } from "@prisma/client";
 import { v4 as uuid } from "uuid";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -23,82 +22,91 @@ const now = new Date();
 const daysAgo = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60 * 1000);
 
-async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
-}
+// Use fixed UUIDs for demo users
+const NAOMI_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const MICKY_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const COUPLE_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+const CONV_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+
+const MEMORY_1_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+const MEMORY_2_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+const MEMORY_3_ID = "00000000-0000-0000-0000-000000000001";
+
+const TIMELINE_1_ID = "00000000-0000-0000-0000-000000000002";
+const TIMELINE_2_ID = "00000000-0000-0000-0000-000000000003";
+const TIMELINE_3_ID = "00000000-0000-0000-0000-000000000004";
+
+const NOTIF_1_ID = "00000000-0000-0000-0000-000000000005";
+const NOTIF_2_ID = "00000000-0000-0000-0000-000000000006";
+const NOTIF_3_ID = "00000000-0000-0000-0000-000000000007";
+
+const INVITE_ID = "00000000-0000-0000-0000-000000000008";
+
+const REACTION_1_ID = "00000000-0000-0000-0000-000000000009";
+const REACTION_2_ID = "00000000-0000-0000-0000-000000000010";
+
+const PRIVACY_NAOMI_ID = "00000000-0000-0000-0000-000000000011";
+const PRIVACY_MICKY_ID = "00000000-0000-0000-0000-000000000012";
+
+const MEMBER_NAOMI_ID = "00000000-0000-0000-0000-000000000013";
+const MEMBER_MICKY_ID = "00000000-0000-0000-0000-000000000014";
 
 // ─── Main Seed ────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log("🌱 Seeding database...\n");
 
-  const adminPassword = await hashPassword("Admin123!");
-  const userPassword = await hashPassword("Password123!");
-
   // ── Users ─────────────────────────────────────────────────────────────────
 
-  const admin = await prisma.user.create({
-    data: {
-      id: uuid(),
-      name: "Admin",
-      email: "admin@example.com",
-      emailVerified: daysAgo(30),
-      password: adminPassword,
-      role: UserRole.ADMIN,
-      username: "admin",
-    },
-  });
-  console.log(`✅ Created admin user: ${admin.email}`);
-
-  const alice = await prisma.user.create({
-    data: {
-      id: uuid(),
-      name: "Alice Johnson",
-      email: "alice@example.com",
-      emailVerified: daysAgo(14),
-      password: userPassword,
-      username: "alice",
+  const naomi = await prisma.user.upsert({
+    where: { id: NAOMI_ID },
+    update: {},
+    create: {
+      id: NAOMI_ID,
+      name: "Naomi",
+      email: "naomi@example.com",
+      username: "naomi",
       bio: "Love coffee, sunsets, and long walks on the beach ☕🌅",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
+      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Naomi",
     },
   });
-  console.log(`✅ Created user: ${alice.email}`);
+  console.log(`✅ Created user: ${naomi.email}`);
 
-  const bob = await prisma.user.create({
-    data: {
-      id: uuid(),
-      name: "Bob Smith",
-      email: "bob@example.com",
-      emailVerified: daysAgo(14),
-      password: userPassword,
-      username: "bob",
+  const micky = await prisma.user.upsert({
+    where: { id: MICKY_ID },
+    update: {},
+    create: {
+      id: MICKY_ID,
+      name: "Micky",
+      email: "micky@example.com",
+      username: "micky",
       bio: "Music lover, amateur chef, dog dad 🎵👨‍🍳🐕",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
+      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Micky",
     },
   });
-  console.log(`✅ Created user: ${bob.email}`);
+  console.log(`✅ Created user: ${micky.email}`);
 
   // ── Couple ────────────────────────────────────────────────────────────────
 
   const couple = await prisma.couple.create({
     data: {
-      id: uuid(),
+      id: COUPLE_ID,
     },
   });
 
   await prisma.coupleMember.createMany({
     data: [
-      { id: uuid(), coupleId: couple.id, userId: alice.id, joinedAt: daysAgo(12) },
-      { id: uuid(), coupleId: couple.id, userId: bob.id, joinedAt: daysAgo(12) },
+      { id: MEMBER_NAOMI_ID, coupleId: couple.id, userId: naomi.id, joinedAt: daysAgo(12) },
+      { id: MEMBER_MICKY_ID, coupleId: couple.id, userId: micky.id, joinedAt: daysAgo(12) },
     ],
   });
-  console.log(`✅ Created couple (Alice + Bob) with ${2} members`);
+  console.log(`✅ Created couple (Naomi + Micky) with ${2} members`);
 
   // ── Conversation ──────────────────────────────────────────────────────────
 
   const conversation = await prisma.conversation.create({
     data: {
-      id: uuid(),
+      id: CONV_ID,
       coupleId: couple.id,
     },
   });
@@ -107,6 +115,7 @@ async function main() {
   // ── Messages ──────────────────────────────────────────────────────────────
 
   const messageData: {
+    id: string;
     conversationId: string;
     senderId: string;
     content: string;
@@ -114,99 +123,107 @@ async function main() {
     createdAt: Date;
   }[] = [
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
-      content: "Hey Bob! How was your day? 💕",
+      senderId: naomi.id,
+      content: "Hey Micky! How was your day? 💕",
       type: MessageType.TEXT,
       createdAt: minutesAgo(120),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "It was great! I finally nailed that pasta recipe you shared with me 🍝",
       type: MessageType.TEXT,
       createdAt: minutesAgo(115),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
+      senderId: naomi.id,
       content: "Wait, the carbonara?? Omg I need to try it tonight!",
       type: MessageType.TEXT,
       createdAt: minutesAgo(110),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "Yes! I'll make it for you. But first — want to go to that new bookshop on 5th street this weekend?",
       type: MessageType.TEXT,
       createdAt: minutesAgo(105),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
+      senderId: naomi.id,
       content: "Absolutely! I heard they have a cute café inside too ☕📖",
       type: MessageType.TEXT,
       createdAt: minutesAgo(100),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "Perfect. Date night plan: bookshop → café → homemade carbonara 🍷",
       type: MessageType.TEXT,
       createdAt: minutesAgo(95),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
+      senderId: naomi.id,
       content: "You're the best. Also — I made us a playlist for the road trip next month 🎶",
       type: MessageType.TEXT,
       createdAt: minutesAgo(60),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "You did?? Send it now! I'm so excited for that trip honestly",
       type: MessageType.TEXT,
       createdAt: minutesAgo(55),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
+      senderId: naomi.id,
       content: "It's got that one song we always sing in the car — you know the one 😂",
       type: MessageType.TEXT,
       createdAt: minutesAgo(50),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "No way — our song?? I love you so much ❤️",
       type: MessageType.TEXT,
       createdAt: minutesAgo(45),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: alice.id,
+      senderId: naomi.id,
       content: "Love you too! Can't wait for this weekend 🥰",
       type: MessageType.TEXT,
       createdAt: minutesAgo(40),
     },
     {
+      id: uuid(),
       conversationId: conversation.id,
-      senderId: bob.id,
+      senderId: micky.id,
       content: "Me neither. Goodnight, my love! 💤",
       type: MessageType.TEXT,
       createdAt: minutesAgo(30),
     },
   ];
 
-  // Stagger createdAt so messages have distinct timestamps
   const createdMessages = [];
-  for (let i = 0; i < messageData.length; i++) {
+  for (const msgData of messageData) {
     const msg = await prisma.message.create({
-      data: {
-        ...messageData[i],
-        createdAt: minutesAgo(120 - i * 10),
-      },
+      data: msgData,
     });
     createdMessages.push(msg);
   }
@@ -216,17 +233,17 @@ async function main() {
 
   await prisma.messageReaction.create({
     data: {
-      id: uuid(),
+      id: REACTION_1_ID,
       messageId: createdMessages[9].id,
-      userId: alice.id,
+      userId: naomi.id,
       emoji: "❤️",
     },
   });
   await prisma.messageReaction.create({
     data: {
-      id: uuid(),
+      id: REACTION_2_ID,
       messageId: createdMessages[8].id,
-      userId: bob.id,
+      userId: micky.id,
       emoji: "😂",
     },
   });
@@ -236,11 +253,11 @@ async function main() {
 
   await prisma.memory.create({
     data: {
-      id: uuid(),
+      id: MEMORY_1_ID,
       coupleId: couple.id,
-      creatorId: alice.id,
+      creatorId: naomi.id,
       title: "First Date at the Rooftop Bar",
-      description: "The night we met at that rooftop bar downtown. Bob spilled his drink and I laughed so hard I cried. Best night ever!",
+      description: "The night we met at that rooftop bar downtown. Micky spilled his drink and I laughed so hard I cried. Best night ever!",
       imageUrl: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=800",
       date: daysAgo(180),
     },
@@ -248,9 +265,9 @@ async function main() {
 
   await prisma.memory.create({
     data: {
-      id: uuid(),
+      id: MEMORY_2_ID,
       coupleId: couple.id,
-      creatorId: bob.id,
+      creatorId: micky.id,
       title: "Weekend Trip to the Mountains",
       description: "Surprise weekend getaway. The cabin had no WiFi and we loved every second of it. Board games, hot cocoa, and stargazing.",
       imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800",
@@ -260,11 +277,11 @@ async function main() {
 
   await prisma.memory.create({
     data: {
-      id: uuid(),
+      id: MEMORY_3_ID,
       coupleId: couple.id,
-      creatorId: alice.id,
+      creatorId: naomi.id,
       title: "Adopted Milo 🐕",
-      description: "The day we adopted Milo from the shelter. He stole our hearts immediately. Bob cried first, not me (okay, maybe I did too).",
+      description: "The day we adopted Milo from the shelter. He stole our hearts immediately. Micky cried first, not me (okay, maybe I did too).",
       imageUrl: "https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=800",
       date: daysAgo(60),
     },
@@ -275,21 +292,21 @@ async function main() {
 
   await prisma.timelineEvent.create({
     data: {
-      id: uuid(),
+      id: TIMELINE_1_ID,
       coupleId: couple.id,
-      creatorId: alice.id,
+      creatorId: naomi.id,
       title: "We Became Official",
-      description: "The day Bob asked me to be his girlfriend. He was so nervous he forgot his speech.",
+      description: "The day Micky asked me to be his girlfriend. He was so nervous he forgot his speech.",
       date: daysAgo(170),
     },
   });
 
   await prisma.timelineEvent.create({
     data: {
-      id: uuid(),
+      id: TIMELINE_2_ID,
       coupleId: couple.id,
-      creatorId: bob.id,
-      title: "Alice Met My Parents",
+      creatorId: micky.id,
+      title: "Naomi Met My Parents",
       description: "She won over my mom with her lemon tart recipe. Dad approved after the football chat.",
       date: daysAgo(120),
     },
@@ -297,11 +314,11 @@ async function main() {
 
   await prisma.timelineEvent.create({
     data: {
-      id: uuid(),
+      id: TIMELINE_3_ID,
       coupleId: couple.id,
-      creatorId: alice.id,
+      creatorId: naomi.id,
       title: "First Anniversary Dinner",
-      description: "Dinner at that Italian place downtown. Bob surprised me with a handwritten letter. Still have it framed on my desk.",
+      description: "Dinner at that Italian place downtown. Micky surprised me with a handwritten letter. Still have it framed on my desk.",
       date: daysAgo(30),
     },
   });
@@ -311,11 +328,11 @@ async function main() {
 
   await prisma.notification.create({
     data: {
-      id: uuid(),
-      userId: alice.id,
+      id: NOTIF_1_ID,
+      userId: naomi.id,
       type: NotificationType.MESSAGE,
       title: "New Message",
-      message: "Bob sent you a message: \"Love you too! Can't wait for this weekend 🥰\"",
+      message: "Micky sent you a message: \"Love you too! Can't wait for this weekend 🥰\"",
       read: false,
       link: `/chat`,
     },
@@ -323,11 +340,11 @@ async function main() {
 
   await prisma.notification.create({
     data: {
-      id: uuid(),
-      userId: bob.id,
+      id: NOTIF_2_ID,
+      userId: micky.id,
       type: NotificationType.MEMORY,
       title: "New Memory Shared",
-      message: "Alice added a new memory: \"Adopted Milo 🐕\"",
+      message: "Naomi added a new memory: \"Adopted Milo 🐕\"",
       read: true,
       link: `/memories`,
     },
@@ -335,35 +352,24 @@ async function main() {
 
   await prisma.notification.create({
     data: {
-      id: uuid(),
-      userId: alice.id,
+      id: NOTIF_3_ID,
+      userId: naomi.id,
       type: NotificationType.TIMELINE,
       title: "Timeline Update",
-      message: "Bob added a timeline event: \"Alice Met My Parents\"",
+      message: "Micky added a timeline event: \"Naomi Met My Parents\"",
       read: false,
       link: `/timeline`,
     },
   });
-
-  await prisma.notification.create({
-    data: {
-      id: uuid(),
-      userId: admin.id,
-      type: NotificationType.INVITATION,
-      title: "System Notification",
-      message: "Welcome to the Couple Chat admin panel. You have full access.",
-      read: true,
-    },
-  });
-  console.log(`✅ Created 4 notifications`);
+  console.log(`✅ Created 3 notifications`);
 
   // ── Invitation Codes ──────────────────────────────────────────────────────
 
   await prisma.coupleInvitation.create({
     data: {
-      id: uuid(),
+      id: INVITE_ID,
       code: "DEMO-CODE-2024",
-      creatorId: alice.id,
+      creatorId: naomi.id,
       coupleId: couple.id,
       expiresAt: daysAgo(-30), // 30 days from now
     },
@@ -375,35 +381,27 @@ async function main() {
   await prisma.userPrivacySetting.createMany({
     data: [
       {
-        id: uuid(),
-        userId: alice.id,
+        id: PRIVACY_NAOMI_ID,
+        userId: naomi.id,
         showOnlineStatus: true,
         showLastSeen: true,
         readReceipts: true,
       },
       {
-        id: uuid(),
-        userId: bob.id,
+        id: PRIVACY_MICKY_ID,
+        userId: micky.id,
         showOnlineStatus: true,
-        showLastSeen: false, // Bob hides last seen
+        showLastSeen: false, // Micky hides last seen
         readReceipts: true,
-      },
-      {
-        id: uuid(),
-        userId: admin.id,
-        showOnlineStatus: false,
-        showLastSeen: false,
-        readReceipts: false,
       },
     ],
   });
-  console.log(`✅ Created privacy settings for 3 users`);
+  console.log(`✅ Created privacy settings for 2 users`);
 
   console.log("\n🎉 Seed complete!");
   console.log("────────────────────────────────────────");
-  console.log("📧 Admin:  admin@example.com  / Admin123!");
-  console.log("📧 Alice:  alice@example.com  / Password123!");
-  console.log("📧 Bob:    bob@example.com    / Password123!");
+  console.log("📧 Naomi:  naomi@example.com  / Naomi@123");
+  console.log("📧 Micky:  micky@example.com  / Nharnah@12");
 }
 
 main()

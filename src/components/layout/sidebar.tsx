@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -10,7 +9,6 @@ import {
   Calendar,
   Bell,
   Settings,
-  LogOut,
   User,
   ChevronDown,
   Heart,
@@ -174,12 +172,8 @@ export function Sidebar({ user, hasCouple }: SidebarProps) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                className="cursor-pointer text-red-600 focus:text-red-600"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Log out
+              <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600">
+                Demo Mode - No Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

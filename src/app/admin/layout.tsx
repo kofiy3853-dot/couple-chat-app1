@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 
 export default async function AdminLayout({
@@ -7,24 +6,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  if ((session.user as Record<string, unknown>).role !== "ADMIN") {
-    redirect("/dashboard");
-  }
-
+  // Demo mode - no auth, just show admin
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <AdminSidebar
         user={{
-          id: session.user.id ?? "",
-          name: session.user.name ?? null,
-          email: session.user.email ?? null,
-          image: session.user.image ?? null,
+          id: "admin",
+          name: "Admin",
+          email: "admin@example.com",
+          image: null,
         }}
       />
 
@@ -37,7 +27,7 @@ export default async function AdminLayout({
             </span>
             <div className="h-8 w-8 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center">
               <span className="text-sm font-medium text-rose-600 dark:text-rose-400">
-                {session.user.name?.charAt(0)?.toUpperCase() ?? "A"}
+                A
               </span>
             </div>
           </div>

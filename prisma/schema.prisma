@@ -7,25 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+// ─── Users ────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String         @id @default(uuid()) @db.Uuid
-  name          String?
-  username      String?        @unique
-  email         String         @unique
-  emailVerified DateTime?
-  image         String?
-  bio           String?
-  password      String?
-  role          UserRole       @default(USER)
-  status        UserStatus     @default(ACTIVE)
-  lastSeenAt    DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String?
+  username  String?  @unique
+  email     String   @unique
+  image     String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  accounts            Account[]
-  sessions            Session[]
   coupleMembers       CoupleMember[]
   sentMessages        Message[]
   messageReactions    MessageReaction[]
@@ -37,34 +30,6 @@ model User {
   reports              Report[]          @relation("Reporter")
   reviewedReports      Report[]          @relation("Reviewer")
   privacySetting       UserPrivacySetting?
-}
-
-model Account {
-  id                String  @id @default(uuid()) @db.Uuid
-  userId            String  @db.Uuid
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(uuid()) @db.Uuid
-  sessionToken String   @unique
-  userId       String   @db.Uuid
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ─── Couple ──────────────────────────────────────────────────────────────────
@@ -254,16 +219,6 @@ model UserPrivacySetting {
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
-
-enum UserRole {
-  USER
-  ADMIN
-}
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-}
 
 enum MessageType {
   TEXT

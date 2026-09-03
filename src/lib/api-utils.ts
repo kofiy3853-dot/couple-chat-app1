@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "./auth";
 import { UnauthorizedError, AppError, ValidationError } from "./errors";
 
 export interface AuthUser {
@@ -61,16 +60,15 @@ export function paginateResponse<T>(
   });
 }
 
+// Demo mode: return hardcoded user
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const session = await auth();
-  if (!session?.user?.id) return null;
   return {
-    id: session.user.id,
-    name: session.user.name,
-    email: session.user.email,
-    image: session.user.image,
-    username: (session.user as Record<string, unknown>).username as string | null,
-    role: (session.user as Record<string, unknown>).role as string | null,
+    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    name: "Naomi",
+    email: "naomi@example.com",
+    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Naomi",
+    username: "naomi",
+    role: "USER",
   };
 }
 

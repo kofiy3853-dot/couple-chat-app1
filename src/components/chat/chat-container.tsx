@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useChat } from "@/hooks/use-chat";
 import { useSocket } from "@/hooks/use-socket";
 import { useChatStore } from "@/stores/chat-store";
+import { useDemoUserStore } from "@/stores/demo-user-store";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
@@ -29,18 +30,17 @@ interface CoupleData {
 }
 
 interface ChatContainerProps {
-  currentUserId: string;
-  token: string;
   className?: string;
 }
 
-export function ChatContainer({ currentUserId, token, className }: ChatContainerProps) {
+export function ChatContainer({ className }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const { onlineUsers, typingUsers } = useChatStore();
+  const { currentUser, partner, setPartner } = useDemoUserStore();
 
-  const partner = couple?.members.find(
-    (m) => m.user.id !== currentUserId
+  const partnerUser = couple?.members.find(
+    (m) => m.user.id !== currentUser.id
   )?.user;
 
   const conversationId = couple?.conversation?.id ?? null;
@@ -57,7 +57,7 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
     addReaction: httpAddReaction,
   } = useChat({
     conversationId,
-    userId: currentUserId,
+    userId: currentUser.id,
   });
 
   const {
@@ -66,9 +66,9 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
     startTyping,
     stopTyping,
   } = useSocket({
-    token,
+    token: "",
     conversationId,
-    userId: currentUserId,
+    userId: currentUser.id,
   });
 
   useEffect(() => {
@@ -78,6 +78,12 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
         const data = await res.json();
         if (data.success) {
           setCouple(data.data);
+          if (data.data?.members) {
+            const partner = data.data.members.find(
+              (m: { user: { id: string } }) => m.user.id !== currentUser.id
+            )?.user;
+            if (partner) setPartner(partner);
+          }
         }
       } catch {
         // no-op
@@ -87,10 +93,10 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
     }
 
     fetchCouple();
-  }, []);
+  }, [currentUser.id, setPartner]);
 
-  const isPartnerOnline = partner ? onlineUsers.has(partner.id) : false;
-  const isPartnerTyping = partner ? typingUsers.has(partner.id) : false;
+  const isPartnerOnline = partnerUser ? onlineUsers.has(partnerUser.id) : false;
+  const isPartnerTyping = partnerUser ? typingUsers.has(partnerUser.id) : false;
 
   const handleTyping = useCallback(() => {
     if (conversationId) {
@@ -146,7 +152,7 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
     );
   }
 
-  if (!couple || !partner || !conversationId) {
+  if (!couple || !partnerUser || !conversationId) {
     return (
       <div className={cn("flex flex-col h-full bg-white dark:bg-gray-950", className)}>
         <EmptyChat />
@@ -157,19 +163,19 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
   return (
     <div className={cn("flex flex-col h-full bg-white dark:bg-gray-950", className)}>
       <ChatHeader
-        partnerName={partner.name ?? partner.username ?? "Partner"}
-        partnerImage={partner.image}
+        partnerName={partnerUser.name ?? partnerUser.username ?? "Partner"}
+        partnerImage={partnerUser.image}
         isOnline={isPartnerOnline}
-        lastSeen={partner.lastSeenAt}
+        lastSeen={partnerUser.lastSeenAt}
       />
 
       <MessageList
         messages={messages}
-        currentUserId={currentUserId}
+        currentUserId={currentUser.id}
         loading={messagesLoading}
         loadingMore={loadingMore}
         hasMore={hasMore}
-        partnerName={partner.name ?? partner.username ?? undefined}
+        partnerName={partnerUser.name ?? partnerUser.username ?? undefined}
         onLoadMore={loadMore}
         onDelete={handleDelete}
         onReaction={handleReaction}
@@ -177,7 +183,7 @@ export function ChatContainer({ currentUserId, token, className }: ChatContainer
 
       <TypingIndicator
         isVisible={isPartnerTyping}
-        partnerName={partner.name?.split(" ")[0] ?? undefined}
+        partnerName={partnerUser.name?.split(" ")[0] ?? undefined}
       />
 
       <MessageInput

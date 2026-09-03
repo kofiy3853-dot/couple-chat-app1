@@ -2,11 +2,9 @@ import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
-import jwt from "jsonwebtoken";
 import { db } from "@/lib/db";
 
 const PORT = parseInt(process.env.WS_PORT || "3001", 10);
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "";
 const REDIS_URL = process.env.REDIS_URL;
 
 const httpServer: HttpServer = new HttpServer();
@@ -44,48 +42,27 @@ async function setupRedisAdapter() {
   }
 }
 
-// ─── Auth middleware ──────────────────────────────────────────────────────────
+// ─── Demo auth middleware (simple userId from client) ──────────────────────────
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   userName?: string;
 }
 
-async function verifyToken(token: string): Promise<{ id: string; email: string; name?: string } | null> {
-  try {
-    if (!JWT_SECRET) return null;
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      sub?: string;
-      id?: string;
-      email?: string;
-      name?: string;
-    };
-    const userId = decoded.sub || decoded.id;
-    if (!userId || !decoded.email) return null;
-    return { id: userId, email: decoded.email, name: decoded.name };
-  } catch {
-    return null;
-  }
-}
-
 io.use(async (socket: AuthenticatedSocket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-  if (!token || typeof token !== "string") {
-    return next(new Error("Authentication required"));
-  }
-
-  const user = await verifyToken(token);
-  if (!user) {
-    return next(new Error("Invalid or expired token"));
+  // In demo mode, accept userId from query or auth
+  const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+  if (!userId || typeof userId !== "string") {
+    return next(new Error("User ID required"));
   }
 
   // Verify user exists in DB
-  const dbUser = await db.user.findUnique({ where: { id: user.id }, select: { id: true, name: true, status: true } });
-  if (!dbUser || dbUser.status !== "ACTIVE") {
-    return next(new Error("User not found or suspended"));
+  const dbUser = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true } });
+  if (!dbUser) {
+    return next(new Error("User not found"));
   }
 
-  socket.userId = user.id;
-  socket.userName = dbUser.name || user.email;
+  socket.userId = userId;
+  socket.userName = dbUser.name || userId;
   next();
 });
 

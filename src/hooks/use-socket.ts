@@ -16,9 +16,7 @@ export function useSocket({ token, conversationId, userId }: UseSocketOptions) {
   const { addMessage, removeMessage, setTypingUser, setOnlineUser } = useChatStore();
 
   useEffect(() => {
-    if (!token) return;
-
-    const client = WebSocketClient.getInstance({ token });
+    const client = WebSocketClient.getInstance({ token: "" });
     clientRef.current = client;
 
     const unsubConnected = client.on("connected", () => setConnected(true));
@@ -71,7 +69,7 @@ export function useSocket({ token, conversationId, userId }: UseSocketOptions) {
       WebSocketClient.destroyInstance();
       setConnected(false);
     };
-  }, [token, userId, addMessage, removeMessage, setTypingUser, setOnlineUser]);
+  }, [userId, addMessage, removeMessage, setTypingUser, setOnlineUser]);
 
   useEffect(() => {
     const client = clientRef.current;

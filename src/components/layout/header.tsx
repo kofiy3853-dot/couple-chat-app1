@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { signOut } from "next-auth/react";
+
 interface HeaderUser {
   id: string;
   name?: string | null;
@@ -110,11 +110,8 @@ export function Header({ user }: HeaderProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="cursor-pointer text-red-600 focus:text-red-600"
-            >
-              Log out
+            <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600">
+              Demo Mode - No Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
