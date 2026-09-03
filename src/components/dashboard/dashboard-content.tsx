@@ -18,6 +18,7 @@ import { MemoriesPreview } from "./memories-preview";
 import { TimelinePreview } from "./timeline-preview";
 import { NotificationsPreview } from "./notifications-preview";
 import { AnniversaryWidget } from "./anniversary-widget";
+import { LoveMessageWidget } from "./love-message-widget";
 
 interface Partner {
   name: string | null;
@@ -141,6 +142,11 @@ export function DashboardContent({
       <AnniversaryWidget 
         daysTogether={daysTogether ?? 0} 
         anniversaryDate={anniversaryDate} 
+      />
+
+      <LoveMessageWidget
+        userName={userName}
+        partnerName={partner.name}
       />
 
       {/* Stats Row */}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GameLayout } from "./game-layout";
-import { GitBranch, RotateCcw, Trophy } from "lucide-react";
+import { RotateCcw, Trophy, Share2 } from "lucide-react";
 
 interface RatherQuestion {
   optionA: string;
@@ -38,131 +38,123 @@ const ratherQuestions: RatherQuestion[] = [
 
 export function WouldYouRather({ onBack }: { onBack: () => void }) {
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [player1Choice, setPlayer1Choice] = useState<"A" | "B" | null>(null);
-  const [player2Choice, setPlayer2Choice] = useState<"A" | "B" | null>(null);
-  const [currentPlayer, setCurrentPlayer] = useState(1);
-  const [matches, setMatches] = useState(0);
-  const [round, setRound] = useState(1);
-  const [showResult, setShowResult] = useState(false);
+  const [choices, setChoices] = useState<("A" | "B")[]>([]);
+  const [gameOver, setGameOver] = useState(false);
   const [shuffledQuestions] = useState(() =>
     [...ratherQuestions].sort(() => Math.random() - 0.5).slice(0, 10)
   );
 
   const question = shuffledQuestions[currentQuestion];
+  const progress = ((currentQuestion + 1) / shuffledQuestions.length) * 100;
 
-  const handleChoice = useCallback((choice: "A" | "B") => {
-    if (currentPlayer === 1) {
-      setPlayer1Choice(choice);
-      setCurrentPlayer(2);
-    } else {
-      setPlayer2Choice(choice);
-      setShowResult(true);
-      if (player1Choice === choice) {
-        setMatches((m) => m + 1);
-      }
-    }
-  }, [currentPlayer, player1Choice]);
-
-  const handleNext = () => {
+  const handleChoice = (choice: "A" | "B") => {
+    const newChoices = [...choices, choice];
+    setChoices(newChoices);
     if (currentQuestion + 1 >= shuffledQuestions.length) {
-      setCurrentQuestion(shuffledQuestions.length);
+      setGameOver(true);
     } else {
       setCurrentQuestion((q) => q + 1);
-      setPlayer1Choice(null);
-      setPlayer2Choice(null);
-      setCurrentPlayer(1);
-      setShowResult(false);
-      setRound((r) => r + 1);
     }
   };
 
   const handleRestart = () => {
     setCurrentQuestion(0);
-    setPlayer1Choice(null);
-    setPlayer2Choice(null);
-    setCurrentPlayer(1);
-    setMatches(0);
-    setRound(1);
-    setShowResult(false);
+    setChoices([]);
+    setGameOver(false);
   };
 
-  if (currentQuestion >= shuffledQuestions.length) {
-    const percentage = Math.round((matches / shuffledQuestions.length) * 100);
+  const shareText = `I answered ${shuffledQuestions.length} Would You Rather questions! What would you pick? 💕`;
+
+  if (gameOver) {
+    const aCount = choices.filter((c) => c === "A").length;
+    const bCount = choices.filter((c) => c === "B").length;
+
     return (
       <GameLayout title="Would You Rather" onBack={onBack}>
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Trophy className={cn("h-16 w-16 mx-auto mb-4", percentage >= 70 ? "text-yellow-500" : "text-gray-400")} />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {percentage >= 70 ? "You're so in sync! 💕" : percentage >= 50 ? "Pretty close! 🤔" : "Opposites attract! 😄"}
-            </h2>
-            <p className="text-gray-500 mb-4">
-              You matched on {matches} out of {shuffledQuestions.length} questions ({percentage}%)
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={onBack}>Back to Games</Button>
-              <Button onClick={handleRestart}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Play Again
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Trophy className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Results!</h2>
+              <p className="text-gray-500 mb-6">
+                You picked Option A {aCount} times and Option B {bCount} times
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mb-4"
+                onClick={() => navigator.clipboard?.writeText(shareText)}
+              >
+                <Share2 className="h-4 w-4 mr-2" /> Share
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-gray-500 mb-3">Your picks</p>
+              <div className="space-y-3">
+                {shuffledQuestions.map((q, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <Badge variant="outline" className={cn("shrink-0", choices[i] === "A" ? "text-purple-600" : "text-pink-600")}>
+                      {choices[i]}
+                    </Badge>
+                    <p className="text-gray-700">
+                      {choices[i] === "A" ? q.optionA : q.optionB}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onBack} className="flex-1">Back to Games</Button>
+            <Button onClick={handleRestart} className="flex-1">
+              <RotateCcw className="h-4 w-4 mr-2" /> Play Again
+            </Button>
+          </div>
+        </div>
       </GameLayout>
     );
   }
 
   return (
-    <GameLayout title="Would You Rather" subtitle={`Round ${round} — Player ${currentPlayer}'s turn`} onBack={onBack}>
+    <GameLayout title="Would You Rather" subtitle="Pick the one you prefer!" onBack={onBack}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">
             Question {currentQuestion + 1} of {shuffledQuestions.length}
           </span>
-          <Badge variant="secondary">Matches: {matches}</Badge>
+          <Badge variant="secondary">Picked: {choices.length}</Badge>
         </div>
 
-        {showResult && (
-          <Card className={cn(
-            "border-2",
-            player1Choice === player2Choice ? "border-green-500 bg-green-50/50" : "border-orange-500 bg-orange-50/50"
-          )}>
-            <CardContent className="p-4 text-center">
-              <p className="font-medium text-gray-900">
-                {player1Choice === player2Choice
-                  ? "You both chose the same! You're in sync! 💕"
-                  : "Different choices! Opposites attract! 😄"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Progress dots */}
+        <div className="flex gap-1.5 justify-center">
+          {shuffledQuestions.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                i < choices.length
+                  ? choices[i] === "A" ? "bg-purple-500" : "bg-pink-500"
+                  : i === currentQuestion
+                    ? "bg-gray-400"
+                    : "bg-gray-200"
+              )}
+            />
+          ))}
+        </div>
 
         <div className="grid gap-4">
           <button
-            onClick={() => !showResult && handleChoice("A")}
-            disabled={showResult || currentPlayer === 2 && player1Choice !== null}
-            className={cn(
-              "p-6 rounded-xl border-2 text-left transition-all",
-              !showResult
-                ? "border-purple-200 hover:border-purple-500 hover:bg-purple-50 active:scale-[0.98]"
-                : player1Choice === "A" && player2Choice === "A"
-                  ? "border-green-500 bg-green-50"
-                  : player1Choice === "A"
-                    ? "border-blue-500 bg-blue-50"
-                    : player2Choice === "A"
-                      ? "border-orange-500 bg-orange-50"
-                      : "border-gray-200 opacity-50"
-            )}
+            onClick={() => handleChoice("A")}
+            className="p-6 rounded-xl border-2 border-purple-200 text-left transition-all hover:border-purple-500 hover:bg-purple-50 active:scale-[0.98]"
           >
             <span className="inline-block px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm font-medium mb-3">
               Option A
             </span>
             <p className="text-lg font-medium text-gray-900">{question.optionA}</p>
-            {showResult && player1Choice === "A" && (
-              <Badge className="mt-2 bg-blue-500">Player 1 chose this</Badge>
-            )}
-            {showResult && player2Choice === "A" && (
-              <Badge className="mt-2 bg-rose-500">Player 2 chose this</Badge>
-            )}
           </button>
 
           <div className="text-center">
@@ -170,39 +162,15 @@ export function WouldYouRather({ onBack }: { onBack: () => void }) {
           </div>
 
           <button
-            onClick={() => !showResult && handleChoice("B")}
-            disabled={showResult || currentPlayer === 2 && player1Choice !== null}
-            className={cn(
-              "p-6 rounded-xl border-2 text-left transition-all",
-              !showResult
-                ? "border-pink-200 hover:border-pink-500 hover:bg-pink-50 active:scale-[0.98]"
-                : player1Choice === "B" && player2Choice === "B"
-                  ? "border-green-500 bg-green-50"
-                  : player1Choice === "B"
-                    ? "border-blue-500 bg-blue-50"
-                    : player2Choice === "B"
-                      ? "border-orange-500 bg-orange-50"
-                      : "border-gray-200 opacity-50"
-            )}
+            onClick={() => handleChoice("B")}
+            className="p-6 rounded-xl border-2 border-pink-200 text-left transition-all hover:border-pink-500 hover:bg-pink-50 active:scale-[0.98]"
           >
             <span className="inline-block px-3 py-1 rounded-full bg-pink-100 text-pink-700 text-sm font-medium mb-3">
               Option B
             </span>
             <p className="text-lg font-medium text-gray-900">{question.optionB}</p>
-            {showResult && player1Choice === "B" && (
-              <Badge className="mt-2 bg-blue-500">Player 1 chose this</Badge>
-            )}
-            {showResult && player2Choice === "B" && (
-              <Badge className="mt-2 bg-rose-500">Player 2 chose this</Badge>
-            )}
           </button>
         </div>
-
-        {showResult && (
-          <Button onClick={handleNext} className="w-full">
-            {currentQuestion + 1 >= shuffledQuestions.length ? "See Results" : "Next Question →"}
-          </Button>
-        )}
       </div>
     </GameLayout>
   );

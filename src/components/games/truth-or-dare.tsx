@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GameLayout } from "./game-layout";
-import { Flame, Heart, Sparkles, RotateCcw } from "lucide-react";
+import { Flame, Heart, Sparkles, RotateCcw, Share2 } from "lucide-react";
 
 const truths = [
   "What's your favorite memory of us?",
@@ -54,22 +54,14 @@ const dares = [
   "Do a silly dance and make your partner laugh",
 ];
 
-interface Player {
-  name: string;
-  truths: number;
-  dares: number;
-}
-
 export function TruthOrDare({ onBack }: { onBack: () => void }) {
-  const [currentPlayer, setCurrentPlayer] = useState(0);
-  const [players] = useState<Player[]>([
-    { name: "Player 1", truths: 0, dares: 0 },
-    { name: "Player 2", truths: 0, dares: 0 },
-  ]);
+  const [completed, setCompleted] = useState(0);
+  const [skipped, setSkipped] = useState(0);
   const [currentChallenge, setCurrentChallenge] = useState<string | null>(null);
   const [challengeType, setChallengeType] = useState<"truth" | "dare" | null>(null);
-  const [completed, setCompleted] = useState(false);
-  const [round, setRound] = useState(1);
+  const [showResult, setShowResult] = useState(false);
+  const [done, setDone] = useState(false);
+  const [history, setHistory] = useState<{ type: "truth" | "dare"; challenge: string; didIt: boolean }[]>([]);
 
   const getRandomChallenge = useCallback((type: "truth" | "dare") => {
     const pool = type === "truth" ? truths : dares;
@@ -80,44 +72,49 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
     const challenge = getRandomChallenge(type);
     setCurrentChallenge(challenge);
     setChallengeType(type);
-    setCompleted(false);
+    setShowResult(false);
+    setDone(false);
   };
 
   const handleComplete = (didIt: boolean) => {
-    setCompleted(true);
+    setShowResult(true);
+    setDone(true);
     if (didIt) {
-      players[currentPlayer][challengeType === "truth" ? "truths" : "dares"]++;
+      setCompleted((c) => c + 1);
+    } else {
+      setSkipped((s) => s + 1);
     }
+    setHistory((h) => [...h, { type: challengeType!, challenge: currentChallenge!, didIt }]);
   };
 
   const handleNext = () => {
-    setCurrentPlayer((prev) => (prev === 0 ? 1 : 0));
     setCurrentChallenge(null);
     setChallengeType(null);
-    setCompleted(false);
-    if (currentPlayer === 1) setRound((r) => r + 1);
+    setShowResult(false);
+    setDone(false);
   };
 
+  const total = completed + skipped;
+
   return (
-    <GameLayout title="Truth or Dare" subtitle={`Round ${round} — ${players[currentPlayer].name}'s turn`} onBack={onBack}>
+    <GameLayout title="Truth or Dare" subtitle="Take on challenges together!" onBack={onBack}>
       <div className="space-y-6">
         {/* Score */}
         <div className="flex gap-3">
-          {players.map((p, i) => (
-            <Card key={i} className={cn("flex-1", i === currentPlayer && "ring-2 ring-rose-500")}>
-              <CardContent className="p-3 text-center">
-                <p className="text-xs text-gray-500 mb-1">{i === currentPlayer ? "← Your turn" : p.name}</p>
-                <div className="flex justify-center gap-3">
-                  <Badge variant="secondary" className="bg-red-50 text-red-600">
-                    <Flame className="h-3 w-3 mr-1" />{p.truths} truths
-                  </Badge>
-                  <Badge variant="secondary" className="bg-orange-50 text-orange-600">
-                    <Sparkles className="h-3 w-3 mr-1" />{p.dares} dares
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <Card className="flex-1">
+            <CardContent className="p-3 text-center">
+              <Badge variant="secondary" className="bg-green-50 text-green-600">
+                <Heart className="h-3 w-3 mr-1" />{completed} completed
+              </Badge>
+            </CardContent>
+          </Card>
+          <Card className="flex-1">
+            <CardContent className="p-3 text-center">
+              <Badge variant="secondary" className="bg-gray-50 text-gray-600">
+                {skipped} skipped
+              </Badge>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Challenge */}
@@ -131,7 +128,7 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
                 {challengeType === "truth" ? "TRUTH" : "DARE"}
               </Badge>
               <p className="text-lg font-medium text-gray-900 mb-6">{currentChallenge}</p>
-              {!completed ? (
+              {!done ? (
                 <div className="flex gap-3 justify-center">
                   <Button
                     variant="outline"
@@ -149,7 +146,7 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
                 </div>
               ) : (
                 <Button onClick={handleNext} className="w-full">
-                  Next Turn →
+                  Next Challenge →
                 </Button>
               )}
             </CardContent>
@@ -157,7 +154,9 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
         ) : (
           <Card>
             <CardContent className="p-6 text-center">
-              <p className="text-gray-500 mb-6">Choose your challenge, {players[currentPlayer].name}!</p>
+              <p className="text-gray-500 mb-6">
+                {total === 0 ? "Pick your challenge!" : `You've done ${completed} challenges so far`}
+              </p>
               <div className="flex gap-4 justify-center">
                 <Button
                   size="lg"
@@ -175,6 +174,46 @@ export function TruthOrDare({ onBack }: { onBack: () => void }) {
                   <Sparkles className="h-5 w-5 mr-2" /> Dare
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* History */}
+        {history.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-gray-500 mb-3">Recent challenges</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {history.slice().reverse().map((h, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <Badge variant="outline" className={cn("text-xs", h.type === "truth" ? "text-blue-600" : "text-orange-600")}>
+                      {h.type === "truth" ? "T" : "D"}
+                    </Badge>
+                    <span className="text-gray-700 truncate flex-1">{h.challenge}</span>
+                    {h.didIt ? (
+                      <Heart className="h-3 w-3 text-green-500 shrink-0" />
+                    ) : (
+                      <span className="text-xs text-gray-400 shrink-0">skipped</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {total >= 5 && (
+          <Card className="border-rose-200 bg-rose-50/50">
+            <CardContent className="p-4 text-center">
+              <p className="font-medium text-gray-900 mb-2">
+                You completed {completed} out of {total} challenges!
+              </p>
+              <p className="text-sm text-gray-500 mb-3">
+                {completed >= 4 ? "You two are amazing together! 💕" : "Keep going, have fun together! 🎉"}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => { setCompleted(0); setSkipped(0); setHistory([]); }}>
+                <RotateCcw className="h-4 w-4 mr-2" /> Start Over
+              </Button>
             </CardContent>
           </Card>
         )}

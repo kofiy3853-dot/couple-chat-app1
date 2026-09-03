@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GameLayout } from "./game-layout";
-import { Star, RotateCcw, Trophy, Heart } from "lucide-react";
+import { Star, RotateCcw, Heart, Share2 } from "lucide-react";
 
 interface RateCategory {
   name: string;
@@ -27,22 +27,18 @@ const categories: RateCategory[] = [
   { name: "Growth", description: "How much do you grow together?", icon: "🌱" },
 ];
 
-function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-1 justify-center">
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
-          onClick={() => !disabled && onChange(star)}
-          disabled={disabled}
-          className={cn(
-            "transition-all",
-            disabled ? "cursor-default" : "cursor-pointer hover:scale-110"
-          )}
+          onClick={() => onChange(star)}
+          className="transition-all hover:scale-110"
         >
           <Star
             className={cn(
-              "h-8 w-8",
+              "h-10 w-10",
               star <= value
                 ? "fill-yellow-400 text-yellow-400"
                 : "fill-gray-200 text-gray-200"
@@ -56,14 +52,11 @@ function StarRating({ value, onChange, disabled }: { value: number; onChange: (v
 
 export function RateEachOther({ onBack }: { onBack: () => void }) {
   const [currentCategory, setCurrentCategory] = useState(0);
-  const [player1Ratings, setPlayer1Ratings] = useState<number[]>(new Array(categories.length).fill(0));
-  const [player2Ratings, setPlayer2Ratings] = useState<number[]>(new Array(categories.length).fill(0));
-  const [currentPlayer, setCurrentPlayer] = useState(1);
+  const [ratings, setRatings] = useState<number[]>(new Array(categories.length).fill(0));
   const [gameOver, setGameOver] = useState(false);
 
   const category = categories[currentCategory];
-  const ratings = currentPlayer === 1 ? player1Ratings : player2Ratings;
-  const setRatings = currentPlayer === 1 ? setPlayer1Ratings : setPlayer2Ratings;
+  const progress = ((currentCategory + 1) / categories.length) * 100;
 
   const handleRate = (value: number) => {
     const newRatings = [...ratings];
@@ -72,31 +65,28 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
   };
 
   const handleNext = () => {
-    if (currentPlayer === 1) {
-      setCurrentPlayer(2);
+    if (currentCategory + 1 >= categories.length) {
+      setGameOver(true);
     } else {
-      setCurrentPlayer(1);
-      if (currentCategory + 1 >= categories.length) {
-        setGameOver(true);
-      } else {
-        setCurrentCategory((c) => c + 1);
-      }
+      setCurrentCategory((c) => c + 1);
     }
+  };
+
+  const handleBack = () => {
+    if (currentCategory > 0) setCurrentCategory((c) => c - 1);
   };
 
   const handleRestart = () => {
     setCurrentCategory(0);
-    setPlayer1Ratings(new Array(categories.length).fill(0));
-    setPlayer2Ratings(new Array(categories.length).fill(0));
-    setCurrentPlayer(1);
+    setRatings(new Array(categories.length).fill(0));
     setGameOver(false);
   };
 
-  if (gameOver) {
-    const p1Total = player1Ratings.reduce((a, b) => a + b, 0);
-    const p2Total = player2Ratings.reduce((a, b) => a + b, 0);
-    const avgTotal = ((p1Total + p2Total) / 2 / categories.length).toFixed(1);
+  const total = ratings.reduce((a, b) => a + b, 0);
+  const avg = (total / categories.length).toFixed(1);
+  const shareText = `Our relationship scores:\n${categories.map((c, i) => `${c.icon} ${c.name}: ${ratings[i]}/5`).join("\n")}\nOverall: ${avg}/5 💕`;
 
+  if (gameOver) {
     return (
       <GameLayout title="Rate Each Other" onBack={onBack}>
         <div className="space-y-6">
@@ -107,32 +97,49 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
                 Your Relationship Score
               </h2>
               <p className="text-4xl font-bold text-rose-500 mb-2">
-                {avgTotal} <span className="text-lg text-gray-400">/ 5.0</span>
+                {avg} <span className="text-lg text-gray-400">/ 5.0</span>
               </p>
-              <p className="text-gray-500">
-                {Number(avgTotal) >= 4 ? "Incredible connection! 💕" : Number(avgTotal) >= 3 ? "Strong relationship! 🌟" : "Keep building together! 💪"}
+              <p className="text-gray-500 mb-4">
+                {Number(avg) >= 4 ? "Incredible connection! 💕" : Number(avg) >= 3 ? "Strong relationship! 🌟" : "Keep building together! 💪"}
               </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigator.clipboard?.writeText(shareText)}
+              >
+                <Share2 className="h-4 w-4 mr-2" /> Share Results
+              </Button>
             </CardContent>
           </Card>
 
-          <div className="grid gap-2">
-            {categories.map((cat, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{cat.icon}</span>
-                  <span className="font-medium text-gray-700 text-sm">{cat.name}</span>
-                </div>
-                <div className="flex gap-4">
-                  <Badge variant="outline" className="text-blue-600">
-                    P1: {player1Ratings[i]}/5
-                  </Badge>
-                  <Badge variant="outline" className="text-rose-600">
-                    P2: {player2Ratings[i]}/5
-                  </Badge>
-                </div>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-gray-500 mb-3">Your ratings</p>
+              <div className="grid gap-2">
+                {categories.map((cat, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{cat.icon}</span>
+                      <span className="font-medium text-gray-700 text-sm">{cat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }, (_, s) => (
+                        <Star
+                          key={s}
+                          className={cn(
+                            "h-4 w-4",
+                            s < ratings[i]
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "fill-gray-200 text-gray-200"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={onBack} className="flex-1">Back to Games</Button>
@@ -148,19 +155,43 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
   return (
     <GameLayout
       title="Rate Each Other"
-      subtitle={`${category.icon} ${category.name} — Player ${currentPlayer}'s turn`}
+      subtitle={`${category.icon} ${category.name}`}
       onBack={onBack}
     >
       <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">
+            {currentCategory + 1} of {categories.length}
+          </span>
+          <Badge variant="secondary">
+            {ratings.filter((r) => r > 0).length} rated
+          </Badge>
+        </div>
+
+        {/* Progress dots */}
+        <div className="flex gap-1.5 justify-center">
+          {categories.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                i < currentCategory
+                  ? "bg-yellow-500"
+                  : i === currentCategory
+                    ? "bg-gray-400"
+                    : "bg-gray-200"
+              )}
+            />
+          ))}
+        </div>
+
         <Card>
           <CardContent className="p-6 text-center">
             <span className="text-5xl mb-4 block">{category.icon}</span>
             <h2 className="text-xl font-bold text-gray-900 mb-1">{category.name}</h2>
             <p className="text-gray-500 mb-6">{category.description}</p>
-            <div className="flex justify-center mb-4">
-              <StarRating value={ratings[currentCategory]} onChange={handleRate} />
-            </div>
-            <p className="text-sm text-gray-400">
+            <StarRating value={ratings[currentCategory]} onChange={handleRate} />
+            <p className="text-sm text-gray-400 mt-4">
               {ratings[currentCategory] === 0
                 ? "Tap a star to rate"
                 : `${ratings[currentCategory]} out of 5 stars`}
@@ -168,13 +199,20 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
           </CardContent>
         </Card>
 
-        <Button
-          onClick={handleNext}
-          disabled={ratings[currentCategory] === 0}
-          className="w-full"
-        >
-          {currentPlayer === 1 ? "Pass to Player 2 →" : currentCategory + 1 >= categories.length ? "See Results" : "Next Category →"}
-        </Button>
+        <div className="flex gap-3">
+          {currentCategory > 0 && (
+            <Button variant="outline" onClick={handleBack} className="flex-1">
+              ← Back
+            </Button>
+          )}
+          <Button
+            onClick={handleNext}
+            disabled={ratings[currentCategory] === 0}
+            className="flex-1"
+          >
+            {currentCategory + 1 >= categories.length ? "See Results" : "Next →"}
+          </Button>
+        </div>
       </div>
     </GameLayout>
   );
