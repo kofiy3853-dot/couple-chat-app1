@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ForbiddenError } from "@/lib/errors";
+import { NotFoundError } from "@/lib/errors";
+import { assertMessageAccess } from "@/lib/conversation-utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,13 +34,7 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError("Message not found");
     }
 
-    const isMember = message.conversation.couple.members.some(
-      (m) => m.userId === user.id
-    );
-
-    if (!isMember) {
-      throw new ForbiddenError("You are not a member of this conversation");
-    }
+    await assertMessageAccess(messageId, user.id);
 
     const existing = await db.messageReaction.findUnique({
       where: {

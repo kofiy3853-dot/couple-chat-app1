@@ -2,42 +2,13 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from "@/lib/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { assertMessageAccess } from "@/lib/conversation-utils";
 
 const reactionSchema = z.object({
   emoji: z.string().min(1).max(10),
 });
 
-async function verifyMessageAccess(messageId: string, userId: string) {
-  const message = await db.message.findUnique({
-    where: { id: messageId },
-    include: {
-      conversation: {
-        include: {
-          couple: {
-            include: {
-              members: { select: { userId: true } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!message) {
-    throw new NotFoundError("Message not found");
-  }
-
-  const isMember = message.conversation.couple.members.some(
-    (m: { userId: string }) => m.userId === userId
-  );
-
-  if (!isMember) {
-    throw new ForbiddenError("You are not a member of this conversation");
-  }
-
-  return message;
-}
 
 export async function POST(
   request: NextRequest,
@@ -62,7 +33,7 @@ export async function POST(
       );
     }
 
-    await verifyMessageAccess(messageId, user.id);
+    await assertMessageAccess(messageId, user.id);
 
     const emoji = parsed.data.emoji;
 
@@ -127,7 +98,7 @@ export async function DELETE(
       );
     }
 
-    await verifyMessageAccess(messageId, user.id);
+    await assertMessageAccess(messageId, user.id);
 
     const emoji = parsed.data.emoji;
 

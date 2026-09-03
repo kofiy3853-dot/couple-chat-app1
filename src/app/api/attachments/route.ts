@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
+import { assertMessageAccess } from "@/lib/conversation-utils";
 
 // Configure Cloudinary from env vars
 cloudinary.config({
@@ -60,10 +61,7 @@ export async function POST(request: NextRequest) {
 
     if (!message) throw new NotFoundError("Message not found");
 
-    const isMember = message.conversation.couple.members.some(
-      (m: { userId: string }) => m.userId === user.id
-    );
-    if (!isMember) throw new ForbiddenError("You are not a member of this conversation");
+    await assertMessageAccess(messageId, user.id);
 
     // Upload to Cloudinary
     const arrayBuffer = await file.arrayBuffer();

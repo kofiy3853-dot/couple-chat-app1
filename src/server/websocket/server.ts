@@ -185,10 +185,13 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId } = data;
     if (!conversationId) return;
 
-    // Verify user is member of this conversation
+    // Verify user is member of this conversation (couple OR group)
     const conversation = await db.conversation.findUnique({
       where: { id: conversationId },
-      include: { couple: { include: { members: { select: { userId: true } } } } },
+      include: {
+        couple: { include: { members: { select: { userId: true } } } },
+        participants: { select: { userId: true } },
+      },
     });
 
     if (!conversation) {
@@ -196,7 +199,14 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
       return;
     }
 
-    const isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
+    const isCoupleConversation = !conversation.isGroup;
+    let isMember = false;
+    if (isCoupleConversation && conversation.couple) {
+      isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
+    } else {
+      isMember = conversation.participants.some((p: { userId: string }) => p.userId === userId);
+    }
+
     if (!isMember) {
       socket.emit("error", { message: "Not a member of this conversation" });
       return;
@@ -222,10 +232,13 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, content, type = "TEXT", localId } = data;
     if (!conversationId || !content) return;
 
-    // Verify membership
+    // Verify membership (couple OR group)
     const conversation = await db.conversation.findUnique({
       where: { id: conversationId },
-      include: { couple: { include: { members: { select: { userId: true } } } } },
+      include: {
+        couple: { include: { members: { select: { userId: true } } } },
+        participants: { select: { userId: true } },
+      },
     });
 
     if (!conversation) {
@@ -233,7 +246,14 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
       return;
     }
 
-    const isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
+    const isCoupleConversation = !conversation.isGroup;
+    let isMember = false;
+    if (isCoupleConversation && conversation.couple) {
+      isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
+    } else {
+      isMember = conversation.participants.some((p: { userId: string }) => p.userId === userId);
+    }
+
     if (!isMember) {
       socket.emit("error", { message: "Not a member" });
       return;

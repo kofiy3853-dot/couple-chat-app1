@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import { messageSchema } from "@/lib/validation";
+import { assertConversationMember } from "@/lib/conversation-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,13 +37,7 @@ export async function GET(request: NextRequest) {
       throw new NotFoundError("Conversation not found");
     }
 
-    const isMember = conversation.couple.members.some(
-      (m: { userId: string }) => m.userId === user.id
-    );
-
-    if (!isMember) {
-      throw new ForbiddenError("You are not a member of this conversation");
-    }
+    await assertConversationMember(conversationId, user.id);
 
     const messages = await db.message.findMany({
       where: {
@@ -151,13 +146,7 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError("Conversation not found");
     }
 
-    const isMember = conversation.couple.members.some(
-      (m: { userId: string }) => m.userId === user.id
-    );
-
-    if (!isMember) {
-      throw new ForbiddenError("You are not a member of this conversation");
-    }
+    await assertConversationMember(conversationId, user.id);
 
     const message = await db.message.create({
       data: {
@@ -189,7 +178,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const partnerMember = conversation.couple.members.find(
+    // Only send notification for couple (private) chats
+    const partnerMember = conversation.couple?.members.find(
       (m: { userId: string }) => m.userId !== user.id
     );
 
@@ -229,8 +219,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!conversation) throw new NotFoundError("Conversation not found");
 
-    const isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === user.id);
-    if (!isMember) throw new ForbiddenError("You are not a member of this conversation");
+    await assertConversationMember(conversationId, user.id);
 
     await db.message.updateMany({
       where: { conversationId, deletedAt: null },

@@ -33,9 +33,10 @@ interface CoupleData {
 
 interface ChatContainerProps {
   className?: string;
+  overrideConversationId?: string | null;
 }
 
-export function ChatContainer({ className }: ChatContainerProps) {
+export function ChatContainer({ className, overrideConversationId }: ChatContainerProps) {
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
@@ -48,7 +49,9 @@ export function ChatContainer({ className }: ChatContainerProps) {
     (m) => m.user.id !== currentUser?.id
   )?.user;
 
-  const conversationId = couple?.conversation?.id ?? null;
+  // Use override conversation (group chat) or fall back to couple conversation
+  const coupleConversationId = couple?.conversation?.id ?? null;
+  const conversationId = overrideConversationId ?? coupleConversationId;
 
   const {
     messages,
