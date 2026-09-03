@@ -4,7 +4,7 @@ import { authConfig } from "@/lib/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
-const protectedRoutes = ["/", "/chat", "/memories", "/timeline", "/notifications", "/settings", "/couple", "/profile"];
+const protectedRoutes = ["/", "/chat", "/memories", "/timeline", "/notifications", "/settings", "/couple", "/profile", "/games", "/dashboard"];
 const adminRoutes = ["/admin"];
 const authRoutes = ["/login", "/register"];
 

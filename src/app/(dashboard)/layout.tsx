@@ -2,9 +2,9 @@ import { db } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { DashboardLayoutClient } from "@/components/layout/dashboard-layout-client";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 
 export default async function DashboardLayout({
   children,
@@ -30,12 +30,6 @@ export default async function DashboardLayout({
   });
   const hasCouple = !!coupleMember;
 
-  // Determine current pathname via Next.js request headers.
-  // The chat page has its own ChatHeader, so we suppress the global Header there.
-  const headersList = await headers();
-  const pathname = headersList.get("x-pathname") ?? "";
-  const isChat = pathname === "/chat";
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar
@@ -44,18 +38,16 @@ export default async function DashboardLayout({
       />
 
       <div className="lg:pl-[280px] flex flex-col min-h-screen">
-        {!isChat && (
-          <Header
-            user={currentUser}
-          />
-        )}
+        <DashboardLayoutClient user={currentUser}>
+          <Header user={currentUser} />
+        </DashboardLayoutClient>
 
-        <main className={isChat ? "flex-1 overflow-hidden" : "flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8"}>
+        <DashboardLayoutClient user={currentUser} mainOnly>
           {children}
-        </main>
+        </DashboardLayoutClient>
       </div>
 
       <MobileNav hasCouple={hasCouple} />
     </div>
   );
-}
+}

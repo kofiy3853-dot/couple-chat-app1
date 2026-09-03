@@ -27,11 +27,13 @@ interface HeaderProps {
 }
 
 const routeTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/": "Dashboard",
   "/chat": "Chat",
+  "/games": "Games",
   "/memories": "Memories",
   "/timeline": "Timeline",
   "/notifications": "Notifications",
+  "/couple": "Connect with Partner",
   "/settings": "Settings",
   "/settings/profile": "Profile",
 };
