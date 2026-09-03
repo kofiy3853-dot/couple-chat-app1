@@ -31,13 +31,13 @@ export default async function DashboardLayout({
   const hasCouple = !!coupleMember;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
       <Sidebar
         hasCouple={hasCouple}
         user={currentUser}
       />
 
-      <div className="lg:pl-[280px] flex flex-col min-h-screen">
+      <div className="lg:pl-[280px] flex flex-col h-screen">
         <DashboardLayoutClient user={currentUser}>
           <Header user={currentUser} />
         </DashboardLayoutClient>

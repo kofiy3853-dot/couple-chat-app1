@@ -32,8 +32,8 @@ export function DashboardLayoutClient({
       <main
         className={
           isChat
-            ? "flex-1 overflow-hidden"
-            : "flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8"
+            ? "flex-1 min-h-0 overflow-hidden"
+            : "flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8"
         }
       >
         {children}
