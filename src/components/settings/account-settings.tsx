@@ -114,7 +114,7 @@ export function AccountSettings({ profile, onUpdate }: AccountSettingsProps) {
       const res = await fetch("/api/users/profile", { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        window.location.href = "/login";
+        window.location.href = "/dashboard";
       } else {
         setMessage(data.error?.message ?? "Failed to delete account");
         setDeleteDialogOpen(false);

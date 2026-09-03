@@ -24,12 +24,9 @@ export function SecuritySettings() {
   async function handleLogoutAll() {
     setLoggingOut(true);
     try {
-      const res = await fetch("/api/auth/signout", { method: "POST" });
-      if (res.ok) {
-        setMessage("All sessions have been terminated");
-        setLogoutAllDialogOpen(false);
-        window.location.href = "/login";
-      }
+      // Demo mode - just show message
+      setMessage("Demo mode: logout not available");
+      setLogoutAllDialogOpen(false);
     } catch {
       setMessage("Failed to logout all sessions");
     } finally {
