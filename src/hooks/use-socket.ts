@@ -9,7 +9,7 @@ interface UseSocketOptions {
   userId: string;
 }
 
-export function useSocket({ token, conversationId, userId }: UseSocketOptions) {
+export function useSocket({ conversationId, userId }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<WebSocketClient | null>(null);
   const { addMessage, removeMessage, setTypingUser, setOnlineUser } = useChatStore();
