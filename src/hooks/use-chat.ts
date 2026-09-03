@@ -26,7 +26,7 @@ interface Message {
   conversationId: string;
   senderId: string;
   content: string;
-  type: "TEXT" | "IMAGE";
+  type: "TEXT" | "IMAGE" | "AUDIO";
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -35,7 +35,7 @@ interface Message {
   replyTo: {
     id: string;
     content: string;
-    type: "TEXT" | "IMAGE";
+    type: "TEXT" | "IMAGE" | "AUDIO";
     sender: { id: string; name: string | null; username: string | null };
   } | null;
   sender: MessageSender;

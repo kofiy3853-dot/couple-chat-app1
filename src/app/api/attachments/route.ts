@@ -12,8 +12,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav"];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,18 +33,29 @@ export async function POST(request: NextRequest) {
       return errorResponse(new ValidationError("messageId is required", { messageId: ["Required"] }));
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+    const isAudio = ALLOWED_AUDIO_TYPES.includes(file.type);
+
+    if (!isImage && !isAudio) {
       return errorResponse(
         new ValidationError("Invalid file type", {
-          file: ["Only JPEG, PNG, GIF, and WebP images are allowed"],
+          file: ["Only JPEG, PNG, GIF, WebP images or WebM/MP4/MPEG/OGG/WAV audio are allowed"],
         })
       );
     }
 
-    if (file.size > MAX_SIZE) {
+    if (isImage && file.size > MAX_IMAGE_SIZE) {
       return errorResponse(
         new ValidationError("File too large", {
-          file: ["File must be 10MB or smaller"],
+          file: ["Image must be 10MB or smaller"],
+        })
+      );
+    }
+
+    if (isAudio && file.size > MAX_AUDIO_SIZE) {
+      return errorResponse(
+        new ValidationError("File too large", {
+          file: ["Audio must be 25MB or smaller"],
         })
       );
     }
@@ -73,8 +86,10 @@ export async function POST(request: NextRequest) {
           .upload_stream(
             {
               folder: "couple-chat",
-              resource_type: "image",
-              allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+              resource_type: isAudio ? "video" : "image",
+              allowed_formats: isAudio
+                ? ["webm", "mp4", "mp3", "ogg", "wav"]
+                : ["jpg", "jpeg", "png", "gif", "webp"],
             },
             (error, result) => {
               if (error || !result) return reject(error ?? new Error("Upload failed"));

@@ -251,6 +251,7 @@ model UserPrivacySetting {
 enum MessageType {
   TEXT
   IMAGE
+  AUDIO
 }
 
 enum NotificationType {

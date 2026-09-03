@@ -2,11 +2,12 @@
 
 import { memo, useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Trash2, Pencil, Reply, Copy } from "lucide-react";
+import { Check, CheckCheck, Trash2, Pencil, Reply, Copy, Mic } from "lucide-react";
 import Image from "next/image";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ReactionPicker } from "./reaction-picker";
+import { VoiceNotePlayer } from "./voice-note-player";
 import type { Message } from "@/hooks/use-chat";
 
 interface MessageItemProps {
@@ -51,7 +52,9 @@ function MessageItemInner({
 
   const isDeleted = message.deletedAt !== null;
   const isImage = message.type === "IMAGE" && message.attachments?.length > 0;
+  const isAudio = message.type === "AUDIO" && message.attachments?.length > 0;
   const imageUrl = isImage ? message.attachments[0].url : null;
+  const audioUrl = isAudio ? message.attachments[0].url : null;
 
   const reactionsByEmoji = message.reactions.reduce<
     Record<string, { count: string[]; hasOwn: boolean }>
@@ -112,7 +115,7 @@ function MessageItemInner({
                 {message.replyTo.sender.name || message.replyTo.sender.username}
               </div>
               <div className="truncate">
-                {message.replyTo.content || "Image"}
+                {message.replyTo.content || (message.replyTo.type === "IMAGE" ? "Image" : message.replyTo.type === "AUDIO" ? "Voice message" : "")}
               </div>
             </div>
           )}
@@ -141,6 +144,10 @@ function MessageItemInner({
                 onLoad={() => setImageLoaded(true)}
                 unoptimized
               />
+            </div>
+          ) : isAudio && audioUrl ? (
+            <div className="flex items-center gap-2 py-1">
+              <VoiceNotePlayer src={audioUrl} isOwn={isOwn} />
             </div>
           ) : (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
