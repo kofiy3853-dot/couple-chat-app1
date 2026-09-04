@@ -14,6 +14,28 @@ interface DashboardLayoutClientProps {
   children: React.ReactNode;
 }
 
+export function MainContentWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isChat = pathname === "/chat" || pathname.startsWith("/chat/");
+
+  return (
+    <div className={isChat ? "flex flex-col h-screen" : "lg:pl-64 flex flex-col h-screen"}>
+      {children}
+    </div>
+  );
+}
+
+export function ContentArea({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isChat = pathname === "/chat" || pathname.startsWith("/chat/");
+
+  return (
+    <div className={isChat ? "flex-1 overflow-hidden" : "flex-1 overflow-hidden pb-16 lg:pb-0"}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * Client-side layout wrapper that checks the live pathname.
  * - When NOT mainOnly: renders the Header, but hides it on /chat/* routes.

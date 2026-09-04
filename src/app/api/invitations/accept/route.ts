@@ -63,6 +63,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      await tx.conversation.create({
+        data: {
+          coupleId: invitation.coupleId,
+        },
+      });
+
       await tx.coupleInvitation.update({
         where: { id: invitation.id },
         data: { usedById: user.id },

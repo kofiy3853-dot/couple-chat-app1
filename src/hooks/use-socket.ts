@@ -10,6 +10,8 @@ interface UseSocketOptions {
   onNewMessage?: (message: unknown) => void;
   onMessageDeleted?: (messageId: string) => void;
   onMessageEdited?: (data: { messageId: string; content: string; editedBy: string }) => void;
+  onReactionAdded?: (data: { messageId: string; userId: string; userName?: string; emoji: string }) => void;
+  onReactionRemoved?: (data: { messageId: string; userId: string; emoji: string }) => void;
   onGameChallengeReceived?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
   onGameChoiceMade?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
   onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => void;
@@ -17,7 +19,7 @@ interface UseSocketOptions {
   onGameEnded?: (data: { fromUserId: string }) => void;
 }
 
-export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
   const [presenceState, setPresenceState] = useState<Record<string, PresenceStatus>>({});
@@ -27,6 +29,8 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   const onNewMessageRef = useRef(onNewMessage);
   const onMessageDeletedRef = useRef(onMessageDeleted);
   const onMessageEditedRef = useRef(onMessageEdited);
+  const onReactionAddedRef = useRef(onReactionAdded);
+  const onReactionRemovedRef = useRef(onReactionRemoved);
   const onGameChallengeReceivedRef = useRef(onGameChallengeReceived);
   const onGameChoiceMadeRef = useRef(onGameChoiceMade);
   const onGameQuestionReceivedRef = useRef(onGameQuestionReceived);
@@ -36,6 +40,8 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   useEffect(() => { onNewMessageRef.current = onNewMessage; }, [onNewMessage]);
   useEffect(() => { onMessageDeletedRef.current = onMessageDeleted; }, [onMessageDeleted]);
   useEffect(() => { onMessageEditedRef.current = onMessageEdited; }, [onMessageEdited]);
+  useEffect(() => { onReactionAddedRef.current = onReactionAdded; }, [onReactionAdded]);
+  useEffect(() => { onReactionRemovedRef.current = onReactionRemoved; }, [onReactionRemoved]);
   useEffect(() => { onGameChallengeReceivedRef.current = onGameChallengeReceived; }, [onGameChallengeReceived]);
   useEffect(() => { onGameChoiceMadeRef.current = onGameChoiceMade; }, [onGameChoiceMade]);
   useEffect(() => { onGameQuestionReceivedRef.current = onGameQuestionReceived; }, [onGameQuestionReceived]);
@@ -121,6 +127,14 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onMessageEditedRef.current?.(data);
     });
 
+    const unsubReactionAdded = client.on("reaction-added", (data: { messageId: string; userId: string; userName?: string; emoji: string }) => {
+      onReactionAddedRef.current?.(data);
+    });
+
+    const unsubReactionRemoved = client.on("reaction-removed", (data: { messageId: string; userId: string; emoji: string }) => {
+      onReactionRemovedRef.current?.(data);
+    });
+
     const unsubGameChallenge = client.on("game-challenge-received", (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
       onGameChallengeReceivedRef.current?.(data);
     });
@@ -158,6 +172,8 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       unsubNewMessage();
       unsubMessageDeleted();
       unsubMessageEdited();
+      unsubReactionAdded();
+      unsubReactionRemoved();
       unsubGameChallenge();
       unsubGameChoice();
       unsubGameQuestion();
@@ -186,6 +202,35 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   const sendMessage = useCallback(
     (conversationId: string, content: string, type: "TEXT" | "IMAGE" = "TEXT") => {
       clientRef.current?.sendMessage({ conversationId, content, type });
+    },
+    []
+  );
+
+  const broadcastMessage = useCallback(
+    (message: { id: string; conversationId: string; senderId: string; content: string; type: string; deletedAt: unknown; createdAt: string; updatedAt: string; isEdited: boolean; replyToId: string | null; replyTo: unknown; sender: unknown; reactions: unknown[]; attachments: unknown[] }) => {
+      clientRef.current?.getSocket()?.emit("broadcast-new-message", { message });
+    },
+    []
+  );
+
+  const broadcastMessageDeleted = useCallback(
+    (messageId: string, conversationId: string) => {
+      clientRef.current?.getSocket()?.emit("message-deleted", { messageId, conversationId });
+    },
+    []
+  );
+
+  const broadcastMessageEdited = useCallback(
+    (messageId: string, conversationId: string, content: string) => {
+      clientRef.current?.getSocket()?.emit("message-edited", { messageId, conversationId, content });
+    },
+    []
+  );
+
+  const broadcastReactionToggled = useCallback(
+    (messageId: string, conversationId: string, emoji: string, removed: boolean) => {
+      const event = removed ? "reaction-removed" : "reaction-added";
+      clientRef.current?.getSocket()?.emit(event, { messageId, conversationId, emoji });
     },
     []
   );
@@ -308,6 +353,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     typingState,
     presenceState,
     sendMessage,
+    broadcastMessage,
+    broadcastMessageDeleted,
+    broadcastMessageEdited,
+    broadcastReactionToggled,
     startTyping,
     stopTyping,
     startRecording,

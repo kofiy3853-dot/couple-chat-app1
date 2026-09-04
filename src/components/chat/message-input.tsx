@@ -15,6 +15,7 @@ const QUICK_EMOJIS = [
 
 interface MessageInputProps {
   onSend: (content: string) => void;
+  onMessageCreated?: (message: Message) => void;
   onTyping?: () => void;
   onStopTyping?: () => void;
   disabled?: boolean;
@@ -29,6 +30,7 @@ interface MessageInputProps {
 
 export function MessageInput({
   onSend,
+  onMessageCreated,
   onTyping,
   onStopTyping,
   disabled = false,
@@ -69,6 +71,7 @@ export function MessageInput({
         const tempData = await tempRes.json();
         if (tempData.success) {
           const messageId = tempData.data.id;
+          const createdMessage = tempData.data as Message;
           const formData = new FormData();
           const file = new File([blob], `voice-${Date.now()}.webm`, { type: "audio/webm" });
           formData.append("file", file);
@@ -77,6 +80,14 @@ export function MessageInput({
           if (!attachRes.ok) {
             const err = await attachRes.json();
             toast({ title: "Upload failed", description: err?.error?.message || "Could not upload voice note", variant: "destructive" });
+          } else {
+            const attachData = await attachRes.json();
+            if (attachData.success) {
+              onMessageCreated?.({
+                ...createdMessage,
+                attachments: [attachData.data],
+              });
+            }
           }
         }
       } catch {
@@ -85,7 +96,7 @@ export function MessageInput({
         setUploading(false);
       }
     },
-    [conversationId, toast]
+    [conversationId, onMessageCreated, toast]
   );
 
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder({
@@ -99,7 +110,8 @@ export function MessageInput({
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 42), 100);
+    textarea.style.height = `${newHeight}px`;
   }, []);
 
   useEffect(() => {
@@ -140,6 +152,7 @@ export function MessageInput({
         const tempData = await tempRes.json();
         if (tempData.success) {
           const messageId = tempData.data.id;
+          const createdMessage = tempData.data as Message;
           const formData = new FormData();
           formData.append("file", uploadFile);
           formData.append("messageId", messageId);
@@ -147,6 +160,14 @@ export function MessageInput({
           if (!attachRes.ok) {
             const err = await attachRes.json();
             toast({ title: "Upload failed", description: err?.error?.message || "Could not upload image", variant: "destructive" });
+          } else {
+            const attachData = await attachRes.json();
+            if (attachData.success) {
+              onMessageCreated?.({
+                ...createdMessage,
+                attachments: [attachData.data],
+              });
+            }
           }
         }
       } catch {
@@ -166,7 +187,7 @@ export function MessageInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [content, uploadFile, sending, onSend, onStopTyping, conversationId, toast]);
+  }, [content, uploadFile, sending, onSend, onMessageCreated, onStopTyping, conversationId, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -356,10 +377,9 @@ export function MessageInput({
                 rows={1}
                 disabled={isDisabled}
                 className={cn(
-                  "w-full resize-none rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all",
+                  "w-full resize-none rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all overflow-hidden",
                   isDisabled && "opacity-50 cursor-not-allowed"
                 )}
-                style={{ height: "42px", minHeight: "42px", maxHeight: "150px" }}
               />
             </div>
 

@@ -20,6 +20,7 @@ const httpServer: HttpServer = new HttpServer((req, res) => {
 });
 
 const io = new Server(httpServer, {
+  path: "/api/ws",
   cors: {
     origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
@@ -289,8 +290,9 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   });
 
   // ─── Broadcast new message (after REST save) ────────────────────────────
-  socket.on("broadcast-new-message", (data: { conversationId: string; message: any }) => {
-    const { conversationId, message } = data;
+  socket.on("broadcast-new-message", (data: { conversationId?: string; message?: any }) => {
+    const message = data?.message;
+    const conversationId = data?.conversationId || message?.conversationId;
     if (!conversationId || !message) return;
     socket.to(`conversation:${conversationId}`).emit("new-message", message);
   });

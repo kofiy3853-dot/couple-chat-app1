@@ -255,8 +255,9 @@ app.prepare().then(() => {
     });
 
     // ─── Broadcast new message ──────────────────────────────────────────────
-    socket.on("broadcast-new-message", (data: { conversationId: string; message: unknown }) => {
-      const { conversationId, message } = data;
+    socket.on("broadcast-new-message", (data: { conversationId?: string; message?: { conversationId?: string } }) => {
+      const message = data?.message;
+      const conversationId = data?.conversationId || message?.conversationId;
       if (!conversationId || !message) return;
       socket.to(`conversation:${conversationId}`).emit("new-message", message);
     });

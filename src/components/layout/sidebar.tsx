@@ -56,6 +56,8 @@ export function Sidebar({ user, hasCouple }: SidebarProps) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
 
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
+
   const initials = user.name
     ?.split(" ")
     .map((n) => n[0])
@@ -64,7 +66,7 @@ export function Sidebar({ user, hasCouple }: SidebarProps) {
     .slice(0, 2) || "U";
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-70 lg:bg-white lg:dark:bg-gray-900 lg:border-r lg:border-gray-200 lg:dark:border-gray-800">
+    <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64 lg:bg-white lg:dark:bg-gray-900 lg:border-r lg:border-gray-200 lg:dark:border-gray-800">
       <div className="flex flex-col h-full">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800">

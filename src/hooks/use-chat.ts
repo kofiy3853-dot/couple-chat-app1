@@ -48,12 +48,27 @@ interface MessagesResponse {
   nextCursor: string | null;
 }
 
+interface ChatBroadcasters {
+  newMessage?: (message: Message) => void;
+  messageDeleted?: (messageId: string) => void;
+  messageEdited?: (messageId: string, content: string) => void;
+  reactionToggled?: (messageId: string, emoji: string, removed: boolean) => void;
+}
+
+interface IncomingReaction {
+  messageId: string;
+  userId: string;
+  emoji: string;
+  userName?: string;
+}
+
 interface UseChatOptions {
   conversationId: string | null;
   userId: string;
+  broadcasters?: ChatBroadcasters;
 }
 
-export function useChat({ conversationId, userId }: UseChatOptions) {
+export function useChat({ conversationId, userId, broadcasters }: UseChatOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(() => !!conversationId);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -61,6 +76,11 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
+  const broadcastersRef = useRef(broadcasters);
+
+  useEffect(() => {
+    broadcastersRef.current = broadcasters;
+  }, [broadcasters]);
 
   // Expose setters for WebSocket integration
   const addRealtimeMessage = useCallback((message: Message) => {
@@ -87,6 +107,52 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
           ? { ...m, content, isEdited: true }
           : m
       )
+    );
+  }, []);
+
+  const applyReactionAdded = useCallback((reaction: IncomingReaction) => {
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.id !== reaction.messageId) return message;
+
+        const alreadyExists = message.reactions.some(
+          (item) => item.userId === reaction.userId && item.emoji === reaction.emoji
+        );
+        if (alreadyExists) return message;
+
+        return {
+          ...message,
+          reactions: [
+            ...message.reactions,
+            {
+              id: `temp-${reaction.userId}-${reaction.emoji}`,
+              emoji: reaction.emoji,
+              userId: reaction.userId,
+              user: {
+                id: reaction.userId,
+                name: reaction.userName ?? null,
+                username: null,
+                image: null,
+              },
+            },
+          ],
+        };
+      })
+    );
+  }, []);
+
+  const applyReactionRemoved = useCallback((reaction: IncomingReaction) => {
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.id !== reaction.messageId) return message;
+
+        return {
+          ...message,
+          reactions: message.reactions.filter(
+            (item) => !(item.userId === reaction.userId && item.emoji === reaction.emoji)
+          ),
+        };
+      })
     );
   }, []);
 
@@ -159,6 +225,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
           const newMessage: Message = data.data;
           setMessages((prev) => [...prev, newMessage]);
           lastMessageIdRef.current = newMessage.id;
+          broadcastersRef.current?.newMessage?.(newMessage);
           return newMessage;
         }
         return null;
@@ -185,6 +252,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
             : m
         )
       );
+      broadcastersRef.current?.messageDeleted?.(messageId);
       return true;
     }
     return false;
@@ -206,6 +274,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
             : m
         )
       );
+      broadcastersRef.current?.messageEdited?.(messageId, content);
       return true;
     }
     return false;
@@ -244,6 +313,7 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
           return { ...m, reactions: [...m.reactions, newReaction] };
         })
       );
+      broadcastersRef.current?.reactionToggled?.(messageId, emoji, !!wasRemoved);
       return true;
     }
     return false;
@@ -271,6 +341,8 @@ export function useChat({ conversationId, userId }: UseChatOptions) {
     addRealtimeMessage,
     markMessageDeleted,
     markMessageEdited,
+    applyReactionAdded,
+    applyReactionRemoved,
     clearMessages,
   };
 }

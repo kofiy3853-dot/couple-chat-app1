@@ -43,6 +43,10 @@ class WebSocketClient {
     return this._connected && this.socket?.connected === true;
   }
 
+  getSocket(): Socket | null {
+    return this.socket;
+  }
+
   connect(): void {
     if (this.socket?.connected) return;
     if (!this.userId) {

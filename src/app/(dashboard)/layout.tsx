@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
-import { DashboardLayoutClient } from "@/components/layout/dashboard-layout-client";
+import { DashboardLayoutClient, MainContentWrapper, ContentArea } from "@/components/layout/dashboard-layout-client";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -37,19 +37,19 @@ export default async function DashboardLayout({
         user={currentUser}
       />
 
-      <div className="lg:pl-[280px] flex flex-col h-screen">
+      <MainContentWrapper>
         <DashboardLayoutClient user={currentUser}>
           <Header user={currentUser} />
         </DashboardLayoutClient>
 
         <DashboardLayoutClient user={currentUser} mainOnly>
-          <div className="flex-1 overflow-hidden pb-16 lg:pb-0">
+          <ContentArea>
             {children}
-          </div>
+          </ContentArea>
         </DashboardLayoutClient>
-      </div>
+      </MainContentWrapper>
 
       <MobileNav hasCouple={hasCouple} />
     </div>
   );
-}
+}

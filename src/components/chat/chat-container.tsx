@@ -67,6 +67,8 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
     addRealtimeMessage,
     markMessageDeleted,
     markMessageEdited,
+    applyReactionAdded,
+    applyReactionRemoved,
     clearMessages,
   } = useChat({
     conversationId,
@@ -88,10 +90,28 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
     [markMessageEdited]
   );
 
+  const handleReactionAdded = useCallback(
+    (data: { messageId: string; userId: string; userName?: string; emoji: string }) => {
+      applyReactionAdded(data);
+    },
+    [applyReactionAdded]
+  );
+
+  const handleReactionRemoved = useCallback(
+    (data: { messageId: string; userId: string; emoji: string }) => {
+      applyReactionRemoved(data);
+    },
+    [applyReactionRemoved]
+  );
+
   const {
     connected,
     typingState,
     presenceState,
+    broadcastMessage,
+    broadcastMessageDeleted,
+    broadcastMessageEdited,
+    broadcastReactionToggled,
     startTyping,
     stopTyping,
     markAsRead,
@@ -101,6 +121,8 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
     onNewMessage: handleNewMessage,
     onMessageDeleted: handleMarkMessageDeleted,
     onMessageEdited: handleMarkMessageEdited,
+    onReactionAdded: handleReactionAdded,
+    onReactionRemoved: handleReactionRemoved,
   });
 
   useEffect(() => {
@@ -156,28 +178,53 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
   const handleSend = useCallback(
     async (content: string) => {
       if (editingMessage) {
-        await editMessage(editingMessage, content);
+        const success = await editMessage(editingMessage, content);
+        if (success && conversationId) {
+          broadcastMessageEdited(editingMessage, conversationId, content);
+        }
         setEditingMessage(null);
       } else {
-        await sendMessage(content, "TEXT", replyingTo ?? undefined);
+        const newMessage = await sendMessage(content, "TEXT", replyingTo ?? undefined);
+        if (newMessage) {
+          broadcastMessage(newMessage);
+        }
         setReplyingTo(null);
       }
     },
-    [editingMessage, editMessage, sendMessage, replyingTo]
+    [broadcastMessage, broadcastMessageEdited, conversationId, editingMessage, editMessage, sendMessage, replyingTo]
   );
 
   const handleDelete = useCallback(
     async (messageId: string) => {
-      await deleteMessage(messageId);
+      const success = await deleteMessage(messageId);
+      if (success && conversationId) {
+        broadcastMessageDeleted(messageId, conversationId);
+      }
     },
-    [deleteMessage]
+    [broadcastMessageDeleted, conversationId, deleteMessage]
   );
 
   const handleReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      return addReaction(messageId, emoji);
+      const success = await addReaction(messageId, emoji);
+      if (success && conversationId) {
+        const currentMessage = messages.find((message) => message.id === messageId);
+        const reactionExists = currentMessage?.reactions.some(
+          (reaction) => reaction.userId === currentUser?.id && reaction.emoji === emoji
+        );
+        broadcastReactionToggled(messageId, conversationId, emoji, !!reactionExists);
+      }
+      return success;
     },
-    [addReaction]
+    [addReaction, broadcastReactionToggled, conversationId, currentUser?.id, messages]
+  );
+
+  const handleAttachmentMessage = useCallback(
+    (message: Parameters<typeof addRealtimeMessage>[0]) => {
+      addRealtimeMessage(message);
+      broadcastMessage(message);
+    },
+    [addRealtimeMessage, broadcastMessage]
   );
 
   if (loading) {
@@ -249,6 +296,7 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
 
       <MessageInput
         onSend={handleSend}
+        onMessageCreated={handleAttachmentMessage}
         onTyping={handleTyping}
         onStopTyping={handleStopTyping}
         sending={sending}
