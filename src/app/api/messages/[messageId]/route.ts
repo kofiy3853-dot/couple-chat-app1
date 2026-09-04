@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ForbiddenError } from "@/lib/errors";
+import { NotFoundError, ForbiddenError, ValidationError } from "@/lib/errors";
+import { assertMessageAccess } from "@/lib/conversation-utils";
 
 export async function DELETE(
   _request: NextRequest,
@@ -28,6 +29,8 @@ export async function DELETE(
       return successResponse({ message: "Message already deleted" });
     }
 
+    await assertMessageAccess(messageId, user.id);
+
     await db.message.update({
       where: { id: messageId },
       data: { deletedAt: new Date() },
@@ -50,7 +53,11 @@ export async function PATCH(
 
     const { content } = body;
     if (!content || typeof content !== "string" || !content.trim()) {
-      throw new Error("Content is required and must be a non-empty string");
+      throw new ValidationError("Content is required", { content: ["Required"] });
+    }
+
+    if (content.trim().length > 5000) {
+      throw new ValidationError("Content too long", { content: ["Max 5000 characters"] });
     }
 
     const message = await db.message.findUnique({
@@ -67,7 +74,7 @@ export async function PATCH(
     }
 
     if (message.deletedAt) {
-      throw new Error("Cannot edit a deleted message");
+      throw new ForbiddenError("Cannot edit a deleted message");
     }
 
     const updatedMessage = await db.message.update({

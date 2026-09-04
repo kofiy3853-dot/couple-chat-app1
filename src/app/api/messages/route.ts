@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 import { messageSchema } from "@/lib/validation";
 import { assertConversationMember } from "@/lib/conversation-utils";
 
@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     const messages = await db.message.findMany({
       where: {
         conversationId,
-        ...(cursor
+        deletedAt: null,
+        ...(cursor && !isNaN(new Date(cursor).getTime())
           ? { createdAt: { lt: new Date(cursor) } }
           : {}),
       },
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (partnerMember) {
-      const senderName = user.name || user.email;
+      const senderName = user.name || user.username || "Your partner";
       await db.notification.create({
         data: {
           userId: partnerMember.userId,
@@ -207,22 +208,38 @@ export async function DELETE(request: NextRequest) {
     const user = await requireAuth();
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get("conversationId");
+    const messageId = searchParams.get("messageId");
 
-    if (!conversationId) {
-      return errorResponse(new ValidationError("conversationId is required", { conversationId: ["Required"] }));
+    // Single message delete
+    if (messageId) {
+      const message = await db.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true, deletedAt: true },
+      });
+
+      if (!message) throw new NotFoundError("Message not found");
+      if (message.senderId !== user.id) throw new ForbiddenError("You can only delete your own messages");
+      if (message.deletedAt) return successResponse({ message: "Already deleted" });
+
+      await assertConversationMember(message.conversationId, user.id);
+
+      await db.message.update({
+        where: { id: messageId },
+        data: { deletedAt: new Date() },
+      });
+
+      return successResponse({ deleted: true });
     }
 
-    const conversation = await db.conversation.findUnique({
-      where: { id: conversationId },
-      include: { couple: { include: { members: { select: { userId: true } } } } },
-    });
-
-    if (!conversation) throw new NotFoundError("Conversation not found");
+    // Bulk delete — only delete OWN messages in the conversation
+    if (!conversationId) {
+      return errorResponse(new ValidationError("conversationId or messageId is required", { query: ["Required"] }));
+    }
 
     await assertConversationMember(conversationId, user.id);
 
     await db.message.updateMany({
-      where: { conversationId, deletedAt: null },
+      where: { conversationId, senderId: user.id, deletedAt: null },
       data: { deletedAt: new Date() },
     });
 

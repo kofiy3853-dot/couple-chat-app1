@@ -127,8 +127,19 @@ export async function POST(req: NextRequest) {
       throw new ValidationError("At least one other participant is required");
     }
 
-    // De-dup and add creator
-    const allParticipantIds = Array.from(new Set([user.id, ...participantIds]));
+    // Filter out the creator's own ID and other duplicates
+    const otherParticipantIds = [...new Set(participantIds.filter((id: string) => id !== user.id))];
+
+    if (otherParticipantIds.length < 1) {
+      throw new ValidationError("At least one other participant is required");
+    }
+
+    if (otherParticipantIds.length > 50) {
+      throw new ValidationError("Group cannot have more than 50 members");
+    }
+
+    // Add creator back
+    const allParticipantIds = [user.id, ...otherParticipantIds];
 
     // Verify all users exist
     const users = await db.user.findMany({

@@ -4,6 +4,7 @@ import next from "next";
 import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
+import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/db";
 import type { PresenceStatus } from "@/lib/constants";
 
@@ -27,10 +28,15 @@ app.prepare().then(() => {
     }
   });
 
+  const corsOrigin = process.env.NEXT_PUBLIC_APP_URL;
+  if (!corsOrigin && !dev) {
+    console.error("[WS] NEXT_PUBLIC_APP_URL is not set in production — CORS will reject connections");
+  }
+
   const io = new SocketIOServer(httpServer, {
     path: "/api/ws",
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || "*",
+      origin: corsOrigin || (dev ? "*" : "http://localhost:3000"),
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -61,19 +67,68 @@ app.prepare().then(() => {
 
   // ─── Auth middleware ───────────────────────────────────────────────────────
   const socketUserData = new Map<string, { userId: string; userName: string }>();
+  const membershipCache = new Map<string, { members: Set<string>; isGroup: boolean; expiry: number }>();
+  const MEMBERSHIP_CACHE_TTL = 60_000; // 1 minute
 
   io.use(async (socket, next) => {
-    const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
-    if (!userId || typeof userId !== "string") {
-      return next(new Error("User ID required"));
+    try {
+      // Verify JWT session token from cookies
+      const cookieHeader = socket.handshake.headers?.cookie || "";
+      const token = await getToken({
+        req: { headers: { cookie: cookieHeader } } as unknown as Request,
+        secret: process.env.NEXTAUTH_SECRET,
+      });
+
+      if (!token?.id) {
+        return next(new Error("Unauthorized: invalid session"));
+      }
+
+      const userId = token.id as string;
+      const userName = (token.name as string) || userId;
+
+      // Verify the claimed userId matches the session
+      const claimedUserId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+      if (claimedUserId && claimedUserId !== userId) {
+        return next(new Error("Unauthorized: user ID mismatch"));
+      }
+
+      socketUserData.set(socket.id, { userId, userName });
+      next();
+    } catch (err) {
+      console.error("[WS] Auth error:", err);
+      next(new Error("Unauthorized"));
     }
-    const dbUser = await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true } });
-    if (!dbUser) {
-      return next(new Error("User not found"));
-    }
-    socketUserData.set(socket.id, { userId, userName: dbUser.name || userId });
-    next();
   });
+
+  // ─── Membership check (cached) ────────────────────────────────────────────
+  async function isConversationMember(userId: string, conversationId: string): Promise<{ isMember: boolean; isGroup: boolean }> {
+    const cached = membershipCache.get(conversationId);
+    if (cached && cached.expiry > Date.now()) {
+      return { isMember: cached.members.has(userId), isGroup: cached.isGroup };
+    }
+
+    const conversation = await db.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        couple: { include: { members: { select: { userId: true } } } },
+        participants: { select: { userId: true } },
+      },
+    });
+
+    if (!conversation) return { isMember: false, isGroup: false };
+
+    const members = new Set<string>();
+    const isGroup = conversation.isGroup;
+
+    if (!isGroup && conversation.couple) {
+      conversation.couple.members.forEach((m: { userId: string }) => members.add(m.userId));
+    } else {
+      conversation.participants.forEach((p: { userId: string }) => members.add(p.userId));
+    }
+
+    membershipCache.set(conversationId, { members, isGroup, expiry: Date.now() + MEMBERSHIP_CACHE_TTL });
+    return { isMember: members.has(userId), isGroup };
+  }
 
   // ─── Presence helpers ──────────────────────────────────────────────────────
   const onlineUsers = new Map<string, Set<string>>();
@@ -160,27 +215,7 @@ app.prepare().then(() => {
       const { conversationId } = data;
       if (!conversationId) return;
 
-      const conversation = await db.conversation.findUnique({
-        where: { id: conversationId },
-        include: {
-          couple: { include: { members: { select: { userId: true } } } },
-          participants: { select: { userId: true } },
-        },
-      });
-
-      if (!conversation) {
-        socket.emit("error", { message: "Conversation not found" });
-        return;
-      }
-
-      const isCoupleConversation = !conversation.isGroup;
-      let isMember = false;
-      if (isCoupleConversation && conversation.couple) {
-        isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
-      } else {
-        isMember = conversation.participants.some((p: { userId: string }) => p.userId === userId);
-      }
-
+      const { isMember } = await isConversationMember(userId, conversationId);
       if (!isMember) {
         socket.emit("error", { message: "Not a member of this conversation" });
         return;
@@ -204,27 +239,15 @@ app.prepare().then(() => {
       const { conversationId, content, type = "TEXT", localId } = data;
       if (!conversationId || !content) return;
 
-      const conversation = await db.conversation.findUnique({
-        where: { id: conversationId },
-        include: {
-          couple: { include: { members: { select: { userId: true } } } },
-          participants: { select: { userId: true } },
-        },
-      });
+      // Validate content length (match API validation)
+      const trimmed = content.trim();
+      if (trimmed.length === 0 || trimmed.length > 5000) return;
 
-      if (!conversation) {
-        socket.emit("error", { message: "Conversation not found" });
-        return;
-      }
+      // Validate type
+      const validTypes = ["TEXT", "IMAGE", "AUDIO"];
+      const msgType = validTypes.includes(type) ? type : "TEXT";
 
-      const isCoupleConversation = !conversation.isGroup;
-      let isMember = false;
-      if (isCoupleConversation && conversation.couple) {
-        isMember = conversation.couple.members.some((m: { userId: string }) => m.userId === userId);
-      } else {
-        isMember = conversation.participants.some((p: { userId: string }) => p.userId === userId);
-      }
-
+      const { isMember } = await isConversationMember(userId, conversationId);
       if (!isMember) {
         socket.emit("error", { message: "Not a member" });
         return;
@@ -235,8 +258,8 @@ app.prepare().then(() => {
           data: {
             conversationId,
             senderId: userId,
-            content,
-            type: type as "TEXT" | "IMAGE" | "AUDIO",
+            content: trimmed,
+            type: msgType as "TEXT" | "IMAGE" | "AUDIO",
           },
           include: {
             sender: { select: { id: true, name: true, image: true } },
@@ -255,17 +278,15 @@ app.prepare().then(() => {
     });
 
     // ─── Broadcast new message ──────────────────────────────────────────────
-    socket.on("broadcast-new-message", (data: { conversationId?: string; message?: { conversationId?: string } }) => {
-      const message = data?.message;
-      const conversationId = data?.conversationId || message?.conversationId;
-      if (!conversationId || !message) return;
-      socket.to(`conversation:${conversationId}`).emit("new-message", message);
-    });
+    // REMOVED: Clients must use REST API to persist, then server broadcasts via send-message.
+    // The old handler allowed message forgery since it relayed client-supplied objects without DB persistence.
 
     // ─── Message delivered ──────────────────────────────────────────────────
-    socket.on("message-delivered", (data: { messageId: string; conversationId: string }) => {
+    socket.on("message-delivered", async (data: { messageId: string; conversationId: string }) => {
       const { messageId, conversationId } = data;
       if (!messageId || !conversationId) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("message-delivered", { messageId, deliveredBy: userId });
     });
 
@@ -273,8 +294,37 @@ app.prepare().then(() => {
     socket.on("message-read", async (data: { conversationId: string; lastReadMessageId: string }) => {
       const { conversationId, lastReadMessageId } = data;
       if (!conversationId || !lastReadMessageId) return;
+      const { isMember, isGroup } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
+
+      // Verify the message belongs to this conversation
+      const msg = await db.message.findUnique({ where: { id: lastReadMessageId }, select: { conversationId: true } });
+      if (!msg || msg.conversationId !== conversationId) return;
+
       try {
-        await db.coupleMember.updateMany({ where: { userId }, data: { lastReadMessageId } });
+        if (isGroup) {
+          await db.conversationParticipant.updateMany({
+            where: { userId, conversationId },
+            data: { lastReadMessageId },
+          });
+        } else {
+          // For couple chats, scope to the couple's conversation
+          const conversation = await db.conversation.findUnique({
+            where: { id: conversationId },
+            select: { coupleId: true },
+          });
+          if (conversation?.coupleId) {
+            const coupleMember = await db.coupleMember.findFirst({
+              where: { userId, coupleId: conversation.coupleId },
+            });
+            if (coupleMember) {
+              await db.coupleMember.update({
+                where: { id: coupleMember.id },
+                data: { lastReadMessageId },
+              });
+            }
+          }
+        }
       } catch (err) {
         console.error("[WS] message-read error:", err);
       }
@@ -282,97 +332,133 @@ app.prepare().then(() => {
     });
 
     // ─── Typing ─────────────────────────────────────────────────────────────
-    socket.on("typing-start", (data: { conversationId: string }) => {
+    socket.on("typing-start", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       socket.to(`conversation:${data.conversationId}`).emit("typing-start", { userId, userName, conversationId: data.conversationId });
     });
 
-    socket.on("typing-stop", (data: { conversationId: string }) => {
+    socket.on("typing-stop", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       socket.to(`conversation:${data.conversationId}`).emit("typing-stop", { userId, conversationId: data.conversationId });
     });
 
     // ─── Recording ──────────────────────────────────────────────────────────
-    socket.on("recording-start", (data: { conversationId: string }) => {
+    socket.on("recording-start", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       setPresenceStatus(userId, "recording");
       socket.to(`conversation:${data.conversationId}`).emit("recording-start", { userId, conversationId: data.conversationId });
     });
 
-    socket.on("recording-stop", (data: { conversationId: string }) => {
+    socket.on("recording-stop", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       setPresenceStatus(userId, "online");
       socket.to(`conversation:${data.conversationId}`).emit("recording-stop", { userId, conversationId: data.conversationId });
     });
 
     // ─── Call ───────────────────────────────────────────────────────────────
-    socket.on("call-start", (data: { conversationId: string }) => {
+    socket.on("call-start", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       setPresenceStatus(userId, "in-call");
       socket.to(`conversation:${data.conversationId}`).emit("call-start", { userId, conversationId: data.conversationId });
     });
 
-    socket.on("call-end", (data: { conversationId: string }) => {
+    socket.on("call-end", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
+      const { isMember } = await isConversationMember(userId, data.conversationId);
+      if (!isMember) return;
       setPresenceStatus(userId, "online");
       socket.to(`conversation:${data.conversationId}`).emit("call-end", { userId, conversationId: data.conversationId });
     });
 
     // ─── Reactions ──────────────────────────────────────────────────────────
-    socket.on("reaction-added", (data: { messageId: string; conversationId: string; emoji: string }) => {
+    socket.on("reaction-added", async (data: { messageId: string; conversationId: string; emoji: string }) => {
       const { messageId, conversationId, emoji } = data;
       if (!messageId || !conversationId || !emoji) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("reaction-added", { messageId, userId, userName, emoji });
     });
 
-    socket.on("reaction-removed", (data: { messageId: string; conversationId: string; emoji: string }) => {
+    socket.on("reaction-removed", async (data: { messageId: string; conversationId: string; emoji: string }) => {
       const { messageId, conversationId, emoji } = data;
       if (!messageId || !conversationId || !emoji) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("reaction-removed", { messageId, userId, emoji });
     });
 
     // ─── Message edited ─────────────────────────────────────────────────────
-    socket.on("message-edited", (data: { messageId: string; conversationId: string; content: string }) => {
+    socket.on("message-edited", async (data: { messageId: string; conversationId: string; content: string }) => {
       const { messageId, conversationId, content } = data;
       if (!messageId || !conversationId) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
+      // Verify the user owns this message
+      const msg = await db.message.findUnique({ where: { id: messageId }, select: { senderId: true } });
+      if (!msg || msg.senderId !== userId) return;
       io.to(`conversation:${conversationId}`).emit("message-edited", { messageId, content, editedBy: userId });
     });
 
     // ─── Delete message ─────────────────────────────────────────────────────
-    socket.on("message-deleted", (data: { messageId: string; conversationId: string }) => {
+    socket.on("message-deleted", async (data: { messageId: string; conversationId: string }) => {
       const { messageId, conversationId } = data;
       if (!messageId || !conversationId) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
+      // Verify the user owns this message
+      const msg = await db.message.findUnique({ where: { id: messageId }, select: { senderId: true } });
+      if (!msg || msg.senderId !== userId) return;
       io.to(`conversation:${conversationId}`).emit("message-deleted", { messageId, deletedBy: userId });
     });
 
     // ─── Game events ────────────────────────────────────────────────────────
-    socket.on("game-start", (data: { conversationId: string; type: "truth" | "dare" }) => {
+    socket.on("game-start", async (data: { conversationId: string; type: "truth" | "dare" }) => {
       const { conversationId, type } = data;
       if (!conversationId || !type) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("game-challenge-received", { fromUserId: userId, fromUserName: userName, type });
     });
 
-    socket.on("game-choice", (data: { conversationId: string; type: "truth" | "dare" }) => {
+    socket.on("game-choice", async (data: { conversationId: string; type: "truth" | "dare" }) => {
       const { conversationId, type } = data;
       if (!conversationId || !type) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("game-choice-made", { fromUserId: userId, fromUserName: userName, type });
     });
 
-    socket.on("game-question", (data: { conversationId: string; question: string; type: "truth" | "dare" }) => {
+    socket.on("game-question", async (data: { conversationId: string; question: string; type: "truth" | "dare" }) => {
       const { conversationId, question, type } = data;
       if (!conversationId || !question) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("game-question-received", { fromUserId: userId, fromUserName: userName, question, type });
     });
 
-    socket.on("game-answer", (data: { conversationId: string; completed: boolean }) => {
+    socket.on("game-answer", async (data: { conversationId: string; completed: boolean }) => {
       const { conversationId, completed } = data;
       if (!conversationId) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("game-answer-result", { fromUserId: userId, fromUserName: userName, completed });
     });
 
-    socket.on("game-end", (data: { conversationId: string }) => {
+    socket.on("game-end", async (data: { conversationId: string }) => {
       const { conversationId } = data;
       if (!conversationId) return;
+      const { isMember } = await isConversationMember(userId, conversationId);
+      if (!isMember) return;
       io.to(`conversation:${conversationId}`).emit("game-ended", { fromUserId: userId });
     });
 
@@ -386,7 +472,7 @@ app.prepare().then(() => {
         if (sockets.size === 0) {
           onlineUsers.delete(userId);
           await clearPresenceStatus(userId);
-          setOffline(userId);
+          await setOffline(userId);
           socket.broadcast.emit("user-offline", { userId });
         }
       }

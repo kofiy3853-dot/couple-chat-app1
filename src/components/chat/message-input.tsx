@@ -115,6 +115,12 @@ export function MessageInput({
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     adjustHeight();
   }, [content, adjustHeight]);
 
@@ -182,8 +188,6 @@ export function MessageInput({
     }
 
     setContent("");
-    setUploadFile(null);
-    setUploadPreview(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }

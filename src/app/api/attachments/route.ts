@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 import { assertMessageAccess } from "@/lib/conversation-utils";
 
 // Configure Cloudinary from env vars
@@ -74,7 +74,18 @@ export async function POST(request: NextRequest) {
 
     if (!message) throw new NotFoundError("Message not found");
 
+    // Only allow attaching to your own messages
+    if (message.senderId !== user.id) {
+      throw new ForbiddenError("You can only attach files to your own messages");
+    }
+
     await assertMessageAccess(messageId, user.id);
+
+    // Sanitize filename
+    const sanitizedFilename = file.name
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_{2,}/g, "_")
+      .slice(0, 200);
 
     // Upload to Cloudinary
     const arrayBuffer = await file.arrayBuffer();
@@ -104,7 +115,7 @@ export async function POST(request: NextRequest) {
       data: {
         messageId,
         url: uploadResult.secure_url,
-        filename: file.name,
+        filename: sanitizedFilename,
         mimeType: file.type,
         size: file.size,
       },

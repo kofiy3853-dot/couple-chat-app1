@@ -43,36 +43,61 @@ export async function POST(request: NextRequest) {
       throw new ConflictError("You cannot accept your own invitation");
     }
 
-    const existingMember = await db.coupleMember.findFirst({
-      where: { userId: user.id },
-    });
+    // Move all checks inside serializable transaction to prevent race conditions
+    const result = await db.$transaction(async (tx) => {
+      // Re-fetch and lock the invitation row
+      const lockedInvitation = await tx.coupleInvitation.findUnique({
+        where: { id: invitation.id },
+        include: { couple: { include: { members: true } } },
+      });
 
-    if (existingMember) {
-      throw new ConflictError("You are already in a couple");
-    }
+      if (!lockedInvitation || lockedInvitation.usedById) {
+        throw new ConflictError("This invitation has already been used");
+      }
 
-    if (invitation.couple.members.length >= 2) {
-      throw new ConflictError("This couple is already full");
-    }
+      if (new Date() > lockedInvitation.expiresAt) {
+        throw new ConflictError("This invitation has expired");
+      }
 
-    await db.$transaction(async (tx) => {
+      if (lockedInvitation.couple.members.length >= 2) {
+        throw new ConflictError("This couple is already full");
+      }
+
+      // Check user isn't already in a couple
+      const existingMember = await tx.coupleMember.findFirst({
+        where: { userId: user.id },
+      });
+
+      if (existingMember) {
+        throw new ConflictError("You are already in a couple");
+      }
+
       await tx.coupleMember.create({
         data: {
-          coupleId: invitation.coupleId,
+          coupleId: lockedInvitation.coupleId,
           userId: user.id,
         },
       });
 
-      await tx.conversation.create({
-        data: {
-          coupleId: invitation.coupleId,
-        },
+      // Check if conversation already exists for this couple
+      const existingConversation = await tx.conversation.findUnique({
+        where: { coupleId: lockedInvitation.coupleId },
       });
 
+      if (!existingConversation) {
+        await tx.conversation.create({
+          data: {
+            coupleId: lockedInvitation.coupleId,
+          },
+        });
+      }
+
       await tx.coupleInvitation.update({
-        where: { id: invitation.id },
+        where: { id: lockedInvitation.id },
         data: { usedById: user.id },
       });
+
+      return { success: true };
     });
 
     return successResponse({ message: "Invitation accepted successfully" });

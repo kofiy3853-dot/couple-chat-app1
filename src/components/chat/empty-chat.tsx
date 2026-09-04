@@ -1,7 +1,7 @@
 "use client";
 
 import { Heart, Copy, Check } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -13,30 +13,26 @@ export function EmptyChat({ className }: EmptyChatProps) {
   const [invitationCode, setInvitationCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
 
-  const fetchInvitation = useCallback(async () => {
-    if (fetched) return;
-    setFetched(true);
-
-    setLoading(true);
-    try {
-      const res = await fetch("/api/invitations");
-      const data = await res.json();
-      if (data.success && data.data) {
-        setInvitationCode(data.data.code);
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchInvitation() {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/invitations");
+        const data = await res.json();
+        if (!cancelled && data.success && data.data) {
+          setInvitationCode(data.data.code);
+        }
+      } catch {
+        // no-op
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch {
-      // no-op
-    } finally {
-      setLoading(false);
     }
-  }, [fetched]);
-
-  // Trigger initial fetch on first render
-  if (!fetched) {
     fetchInvitation();
-  }
+    return () => { cancelled = true; };
+  }, []);
 
   async function generateCode() {
     setLoading(true);
@@ -55,9 +51,13 @@ export function EmptyChat({ className }: EmptyChatProps) {
 
   async function copyCode() {
     if (invitationCode) {
-      await navigator.clipboard.writeText(invitationCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(invitationCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // Clipboard API may fail in non-secure contexts
+      }
     }
   }
 

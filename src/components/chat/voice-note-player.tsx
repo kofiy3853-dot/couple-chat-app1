@@ -33,6 +33,8 @@ export function VoiceNotePlayer({ src, isOwn = false, className }: VoiceNotePlay
     audio.addEventListener("ended", onEnded);
 
     return () => {
+      audio.pause();
+      audio.currentTime = 0;
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);

@@ -73,7 +73,7 @@ export function HeroSection() {
           ) : session?.user ? (
             <>
               <Link
-                href="/dashboard"
+                href="/"
                 className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-all duration-200 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30"
               >
                 Go to Dashboard

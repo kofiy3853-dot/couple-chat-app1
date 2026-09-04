@@ -184,8 +184,6 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       if (conversationIdRef.current) {
         client.leaveConversation(conversationIdRef.current);
       }
-      client.disconnect();
-      WebSocketClient.destroyInstance();
       setConnected(false);
     };
   }, [userId]);

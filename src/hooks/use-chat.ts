@@ -172,31 +172,48 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
         params.set("cursor", cursorParam);
       }
 
-      const res = await fetch(`/api/messages?${params.toString()}`);
-      const data = await res.json();
-
-      if (data.success) {
-        const result: MessagesResponse = data.data;
-        if (prepend) {
-          setMessages((prev) => [...result.messages, ...prev]);
-        } else {
-          const sorted = [...result.messages].reverse();
-          setMessages(sorted);
-          if (sorted.length > 0) {
-            lastMessageIdRef.current = sorted[sorted.length - 1].id;
-          }
+      try {
+        const res = await fetch(`/api/messages?${params.toString()}`);
+        if (!res.ok) {
+          setLoading(false);
+          return;
         }
-        setCursor(result.nextCursor);
-        setHasMore(result.nextCursor !== null);
+        const data = await res.json();
+
+        if (data.success) {
+          const result: MessagesResponse = data.data;
+          if (prepend) {
+            setMessages((prev) => [...result.messages, ...prev]);
+          } else {
+            const sorted = [...result.messages].reverse();
+            setMessages(sorted);
+            if (sorted.length > 0) {
+              lastMessageIdRef.current = sorted[sorted.length - 1].id;
+            }
+          }
+          setCursor(result.nextCursor);
+          setHasMore(result.nextCursor !== null);
+        }
+      } catch {
+        // network error
+      } finally {
         setLoading(false);
       }
     },
     [conversationId]
   );
 
-  // Initial fetch only — real-time updates come via WebSocket
+  // Reset and fetch when conversation changes
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    setMessages([]);
+    setHasMore(true);
+    setCursor(null);
+    setLoading(true);
     fetchMessages(null, false);
   }, [conversationId, fetchMessages]);
 
@@ -280,7 +297,7 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
     return false;
   }, []);
 
-  const addReaction = useCallback(async (messageId: string, emoji: string) => {
+  const addReaction = useCallback(async (messageId: string, emoji: string): Promise<{ success: boolean; removed: boolean }> => {
     const res = await fetch("/api/reactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -314,9 +331,9 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
         })
       );
       broadcastersRef.current?.reactionToggled?.(messageId, emoji, !!wasRemoved);
-      return true;
+      return { success: true, removed: !!wasRemoved };
     }
-    return false;
+    return { success: false, removed: false };
   }, [userId]);
 
   const removeReaction = useCallback(

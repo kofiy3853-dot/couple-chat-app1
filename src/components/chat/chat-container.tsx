@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/use-chat";
 import { useSocket } from "@/hooks/use-socket";
 import { useSession } from "next-auth/react";
@@ -37,6 +38,7 @@ interface ChatContainerProps {
 }
 
 export function ChatContainer({ className, overrideConversationId }: ChatContainerProps) {
+  const router = useRouter();
   const [couple, setCouple] = useState<CoupleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
@@ -206,17 +208,13 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
 
   const handleReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      const success = await addReaction(messageId, emoji);
-      if (success && conversationId) {
-        const currentMessage = messages.find((message) => message.id === messageId);
-        const reactionExists = currentMessage?.reactions.some(
-          (reaction) => reaction.userId === currentUser?.id && reaction.emoji === emoji
-        );
-        broadcastReactionToggled(messageId, conversationId, emoji, !!reactionExists);
+      const result = await addReaction(messageId, emoji);
+      if (result.success && conversationId) {
+        broadcastReactionToggled(messageId, conversationId, emoji, result.removed);
       }
-      return success;
+      return result.success;
     },
-    [addReaction, broadcastReactionToggled, conversationId, currentUser?.id, messages]
+    [addReaction, broadcastReactionToggled, conversationId]
   );
 
   const handleAttachmentMessage = useCallback(
@@ -269,6 +267,7 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
         partnerImage={partnerUser.image}
         presenceStatus={partnerPresence}
         lastSeen={null}
+        onBack={() => router.push("/")}
         onClearHistory={handleClearHistory}
       />
 

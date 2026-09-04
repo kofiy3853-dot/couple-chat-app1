@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,8 @@ export function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const savedScrollRef = useRef<number | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
   const handleScroll = useCallback(() => {
@@ -75,20 +77,36 @@ export function MessageList({
     if (!container || !onLoadMore || loadingMore || !hasMore) return;
 
     if (container.scrollTop < 100) {
-      const previousScrollHeight = container.scrollHeight;
+      savedScrollRef.current = container.scrollHeight - container.scrollTop;
+      loadingMoreRef.current = true;
       onLoadMore();
-      requestAnimationFrame(() => {
-        if (container) {
-          const newScrollHeight = container.scrollHeight;
-          container.scrollTop = newScrollHeight - previousScrollHeight;
-        }
-      });
     }
 
     const isNearBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight < 100;
     setShouldAutoScroll(isNearBottom);
   }, [onLoadMore, loadingMore, hasMore]);
+
+  // Restore scroll position after load-more completes
+  useEffect(() => {
+    if (!loadingMoreRef.current || loadingMore) return;
+    loadingMoreRef.current = false;
+
+    const container = containerRef.current;
+    if (container && savedScrollRef.current !== null) {
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - savedScrollRef.current!;
+          savedScrollRef.current = null;
+        }
+      });
+    }
+  }, [loadingMore, messages.length]);
+
+  // Compute read receipt index
+  const lastReadIndex = lastReadMessageId
+    ? messages.findIndex((m) => m.id === lastReadMessageId)
+    : -1;
 
   const hasMessages = messages.length > 0;
 
@@ -113,6 +131,8 @@ export function MessageList({
       bottomRef.current?.scrollIntoView();
     }
   }, [hasMessages, loading]);
+
+  const dateGroups = useMemo(() => groupMessagesByDate(messages), [messages]);
 
   if (loading) {
     return (
@@ -156,8 +176,6 @@ export function MessageList({
     );
   }
 
-  const dateGroups = groupMessagesByDate(messages);
-
   return (
     <div
       ref={containerRef}
@@ -181,13 +199,16 @@ export function MessageList({
           </div>
 
           <div className="space-y-3">
-            {group.messages.map((message, index) => {
+            {group.messages.map((message, _index) => {
               const isOwn = message.senderId === currentUserId;
-              const prevMessage = group.messages[index - 1];
+              const prevMessage = _index > 0 ? group.messages[_index - 1] : null;
               const showAvatar =
                 !isOwn &&
                 (!prevMessage ||
                   prevMessage.senderId !== message.senderId);
+
+              // Use global message index for read receipt, not group-local index
+              const globalIndex = messages.findIndex((m) => m.id === message.id);
 
               return (
                 <MessageItem
@@ -196,7 +217,7 @@ export function MessageList({
                   isOwn={isOwn}
                   currentUserId={currentUserId}
                   showAvatar={showAvatar}
-                  isRead={isOwn && message.id === lastReadMessageId}
+                  isRead={isOwn && globalIndex >= 0 && lastReadIndex >= 0 && globalIndex <= lastReadIndex}
                   onDelete={onDelete}
                   onReaction={onReaction}
                   onReply={onReply}

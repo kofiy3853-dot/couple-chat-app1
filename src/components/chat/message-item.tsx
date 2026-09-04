@@ -127,7 +127,7 @@ function MessageItemInner({
           ) : isImage && imageUrl ? (
             <div
               className="cursor-pointer"
-              onClick={() => window.open(imageUrl, "_blank")}
+              onClick={() => window.open(imageUrl, "_blank", "noopener,noreferrer")}
             >
               {!imageLoaded && (
                 <div className="w-48 h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
@@ -220,13 +220,15 @@ function MessageItemInner({
                 <Reply className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
               </button>
             )}
-            <button
-              onClick={() => navigator.clipboard.writeText(message.content)}
-              className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-              title="Copy"
-            >
-              <Copy className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
-            </button>
+            {message.type === "TEXT" && (
+              <button
+                onClick={() => navigator.clipboard.writeText(message.content)}
+                className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                title="Copy"
+              >
+                <Copy className="h-3.5 w-3.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" />
+              </button>
+            )}
             {isOwn && message.type === "TEXT" && onEdit && (
               <button
                 onClick={() => onEdit(message.id)}

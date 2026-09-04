@@ -78,6 +78,8 @@ model CoupleInvitation {
   creator User    @relation("Creator", fields: [creatorId], references: [id], onDelete: Cascade)
   couple  Couple  @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   usedBy  User?   @relation("UserUsed", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([coupleId, usedById])
 }
 
 // ─── Messaging ───────────────────────────────────────────────────────────────
@@ -130,7 +132,7 @@ model Message {
   attachments  Attachment[]
 
   @@index([conversationId])
-  @@index([createdAt])
+  @@index([conversationId, createdAt])
 }
 
 model MessageReaction {
@@ -144,6 +146,7 @@ model MessageReaction {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 model Attachment {
@@ -156,6 +159,8 @@ model Attachment {
   createdAt DateTime @default(now())
 
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }
 
 // ─── Memory & Timeline ───────────────────────────────────────────────────────

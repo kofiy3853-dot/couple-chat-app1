@@ -91,7 +91,8 @@ export function ChatHeader({
       {onBack && (
         <button
           onClick={onBack}
-          className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
+          aria-label="Back to dashboard"
+          className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
         </button>

@@ -39,10 +39,12 @@ export const profileUpdateSchema = z.object({
 });
 
 export const messageSchema = z.object({
+  conversationId: z.string().uuid("Invalid conversation ID").optional(),
   content: z
     .string()
     .min(1, "Message cannot be empty")
     .max(5000, "Message must be at most 5000 characters"),
+  type: z.enum(["TEXT", "IMAGE", "AUDIO"]).default("TEXT"),
   replyToId: z.string().uuid("Invalid replyToId").optional(),
 });
 
