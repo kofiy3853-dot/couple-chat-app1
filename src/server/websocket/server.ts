@@ -5,6 +5,7 @@ import Redis from "ioredis";
 import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/db";
 import type { PresenceStatus } from "@/lib/constants";
+import "dotenv/config";
 
 // Render passes the PORT environment variable dynamically for Web Services
 const PORT = parseInt(process.env.PORT || process.env.WS_PORT || "3001", 10);
