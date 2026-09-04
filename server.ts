@@ -90,7 +90,7 @@ app.prepare().then(() => {
       const cookieHeader = socket.handshake.headers?.cookie || "";
       const token = await getToken({
         req: { headers: { cookie: cookieHeader } } as unknown as Request,
-        secret: process.env.NEXTAUTH_SECRET,
+        secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
       });
 
       if (!token?.id) {
