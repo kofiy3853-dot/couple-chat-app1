@@ -3,13 +3,17 @@ import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { successResponse, errorResponse } from "@/lib/api-utils";
 import { ValidationError } from "@/lib/errors";
+import { BCRYPT_SALT_ROUNDS } from "@/lib/constants";
 import { z } from "zod";
 
 const registerSchema = z.object({
   name: z.string().min(2),
   username: z.string().min(3).regex(/^[a-zA-Z0-9_]+$/),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+  ),
 });
 
 export async function POST(request: NextRequest) {
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const hashed = await hash(password, 10);
+    const hashed = await hash(password, BCRYPT_SALT_ROUNDS);
 
     const user = await db.user.create({
       data: { name, username, email, password: hashed },

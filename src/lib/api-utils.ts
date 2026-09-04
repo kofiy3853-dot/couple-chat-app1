@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { UnauthorizedError, AppError, ValidationError } from "./errors";
+import { UnauthorizedError, ForbiddenError, AppError, ValidationError } from "./errors";
 import { auth } from "./auth";
+import { ROLES } from "./constants";
 
 export interface AuthUser {
   id: string;
@@ -79,6 +80,14 @@ export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser();
   if (!user) {
     throw new UnauthorizedError();
+  }
+  return user;
+}
+
+export async function requireAdmin(): Promise<AuthUser> {
+  const user = await requireAuth();
+  if (user.role !== ROLES.ADMIN) {
+    throw new ForbiddenError("Admin access required");
   }
   return user;
 }

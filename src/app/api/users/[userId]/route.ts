@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { successResponse, errorResponse } from "@/lib/api-utils";
-import { NotFoundError } from "@/lib/errors";
+import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const currentUser = await requireAuth();
     const { userId } = await params;
 
     const user = await db.user.findUnique({
@@ -33,6 +34,29 @@ export async function GET(
       throw new NotFoundError("User not found");
     }
 
+    const isOwnProfile = currentUser.id === userId;
+
+    let isInSameCouple = false;
+    if (!isOwnProfile) {
+      const currentUserCouple = await db.coupleMember.findFirst({
+        where: { userId: currentUser.id },
+        select: { coupleId: true },
+      });
+      if (currentUserCouple) {
+        const targetInSameCouple = await db.coupleMember.findFirst({
+          where: {
+            userId,
+            coupleId: currentUserCouple.coupleId,
+          },
+        });
+        isInSameCouple = !!targetInSameCouple;
+      }
+    }
+
+    if (!isOwnProfile && !isInSameCouple) {
+      throw new UnauthorizedError("Cannot view profiles of users outside your couple");
+    }
+
     const response: Record<string, unknown> = {
       id: user.id,
       name: user.name,
@@ -43,11 +67,8 @@ export async function GET(
     };
 
     const privacy = user.privacySetting;
-    if (privacy?.showOnlineStatus) {
+    if (privacy?.showOnlineStatus || isOwnProfile) {
       response.isOnline = false;
-    }
-    if (privacy?.showLastSeen) {
-
     }
 
     return successResponse(response);

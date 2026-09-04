@@ -1,15 +1,10 @@
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { requireAdmin, successResponse, errorResponse } from "@/lib/api-utils";
 import { subDays } from "date-fns";
 
 export async function GET() {
   try {
-    const user = await requireAuth();
-
-    if (user.role !== "ADMIN") {
-      const { ForbiddenError } = await import("@/lib/errors");
-      return errorResponse(new ForbiddenError());
-    }
+    await requireAdmin();
 
     const thirtyDaysAgo = subDays(new Date(), 30);
 
@@ -27,13 +22,17 @@ export async function GET() {
       }),
     ]);
 
+    const activeUsers = await db.user.count({
+      where: { updatedAt: { gte: thirtyDaysAgo } },
+    });
+
     return successResponse({
       totalUsers,
-      activeUsers: totalUsers,
+      activeUsers,
       totalCouples,
       totalMessages,
       pendingReports,
-      storageUsage: "2.4 GB",
+      storageUsage: "N/A",
     });
   } catch (error) {
     return errorResponse(error);

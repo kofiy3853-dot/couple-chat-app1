@@ -1,12 +1,23 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
-  trustHost: true,
-  session: { strategy: "jwt" },
+  trustHost: process.env.NODE_ENV !== "production",
+  session: { strategy: "jwt" as const, maxAge: 30 * 24 * 60 * 60 },
   pages: {
     signIn: "/login",
   },
   providers: [],
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "strict",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

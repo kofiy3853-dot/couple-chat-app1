@@ -20,8 +20,8 @@ export const viewport: Viewport = {
   themeColor: "#e11d48",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export const metadata: Metadata = {
@@ -50,7 +50,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      style={{ colorScheme: "light" }}
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />

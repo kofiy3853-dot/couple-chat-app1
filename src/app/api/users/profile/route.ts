@@ -77,8 +77,27 @@ export async function DELETE() {
   try {
     const user = await requireAuth();
 
-    await db.user.delete({
-      where: { id: user.id },
+    await db.$transaction(async (tx) => {
+      const coupleMember = await tx.coupleMember.findFirst({
+        where: { userId: user.id },
+        select: { coupleId: true },
+      });
+
+      if (coupleMember) {
+        await tx.conversation.deleteMany({ where: { coupleId: coupleMember.coupleId } });
+        await tx.memory.deleteMany({ where: { coupleId: coupleMember.coupleId } });
+        await tx.timelineEvent.deleteMany({ where: { coupleId: coupleMember.coupleId } });
+        await tx.coupleInvitation.deleteMany({ where: { coupleId: coupleMember.coupleId } });
+        await tx.coupleMember.deleteMany({ where: { coupleId: coupleMember.coupleId } });
+        await tx.couple.delete({ where: { id: coupleMember.coupleId } });
+      }
+
+      await tx.notification.deleteMany({ where: { userId: user.id } });
+      await tx.messageReaction.deleteMany({ where: { userId: user.id } });
+      await tx.conversationParticipant.deleteMany({ where: { userId: user.id } });
+      await tx.userPrivacySetting.deleteMany({ where: { userId: user.id } });
+      await tx.message.deleteMany({ where: { senderId: user.id } });
+      await tx.user.delete({ where: { id: user.id } });
     });
 
     return successResponse({ message: "Account deleted successfully" });

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { requireAdmin, successResponse, errorResponse } from "@/lib/api-utils";
+import { AppError, ValidationError } from "@/lib/errors";
 import { z } from "zod";
 
 const updateUserSchema = z.object({
@@ -13,20 +14,15 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const user = await requireAuth();
+    await requireAdmin();
     const { userId } = await params;
-
-    if (user.role !== "ADMIN") {
-      const { ForbiddenError } = await import("@/lib/errors");
-      return errorResponse(new ForbiddenError());
-    }
 
     const body = await request.json();
     const parsed = updateUserSchema.safeParse(body);
 
     if (!parsed.success) {
       return errorResponse(
-        new (await import("@/lib/errors")).ValidationError(
+        new ValidationError(
           "Validation failed",
           parsed.error.flatten().fieldErrors as Record<string, string[]>
         )
@@ -35,9 +31,7 @@ export async function PATCH(
 
     const targetUser = await db.user.findUnique({ where: { id: userId } });
     if (!targetUser) {
-      return errorResponse(
-        new (await import("@/lib/errors")).AppError("User not found", 404, "NOT_FOUND")
-      );
+      return errorResponse(new AppError("User not found", 404, "NOT_FOUND"));
     }
 
     const updated = await db.user.update({

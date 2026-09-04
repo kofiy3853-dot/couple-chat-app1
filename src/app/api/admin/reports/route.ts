@@ -1,15 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse, paginateResponse } from "@/lib/api-utils";
+import { requireAdmin, successResponse, errorResponse, paginateResponse } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth();
-
-    if (user.role !== "ADMIN") {
-      const { ForbiddenError } = await import("@/lib/errors");
-      return errorResponse(new ForbiddenError());
-    }
+    await requireAdmin();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") ?? "1");
