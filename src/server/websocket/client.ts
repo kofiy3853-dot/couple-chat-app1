@@ -49,17 +49,13 @@ class WebSocketClient {
 
   connect(): void {
     if (this.socket?.connected) return;
-    if (!this.userId) {
-      console.warn("[WS Client] No userId provided, skipping connection");
-      return;
-    }
 
     this.socket = io(this.url, {
       path: "/api/ws",
       transports: ["websocket", "polling"],
       reconnection: false,
       timeout: 10000,
-      auth: { userId: this.userId },
+      withCredentials: true,
     });
 
     this.socket.on("connect", () => {

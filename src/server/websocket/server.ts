@@ -105,15 +105,17 @@ io.use(async (socket: AuthenticatedSocket, next) => {
     }
 
     const userId = token.id as string;
-    const userName = (token.name as string) || userId;
+    const dbUser = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true },
+    });
 
-    const claimedUserId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
-    if (claimedUserId && claimedUserId !== userId) {
-      return next(new Error("Unauthorized: user ID mismatch"));
+    if (!dbUser) {
+      return next(new Error("Unauthorized: user not found"));
     }
 
     socket.userId = userId;
-    socket.userName = userName;
+    socket.userName = dbUser.name || userId;
     next();
   } catch (err) {
     console.error("[WS] Auth error:", err);

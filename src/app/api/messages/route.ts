@@ -149,12 +149,16 @@ export async function POST(request: NextRequest) {
 
     await assertConversationMember(conversationId, user.id);
 
+    const messageTypeValid = (type: unknown): type is "TEXT" | "IMAGE" | "AUDIO" =>
+      type === "TEXT" || type === "IMAGE" || type === "AUDIO";
+    const finalType: "TEXT" | "IMAGE" | "AUDIO" = messageTypeValid(type) ? type : "TEXT";
+
     const message = await db.message.create({
       data: {
         conversationId,
         senderId: user.id,
         content: parsed.data.content,
-        type: (type === "IMAGE" ? "IMAGE" : "TEXT") as "TEXT" | "IMAGE",
+        type: finalType,
         replyToId,
       },
       include: {
