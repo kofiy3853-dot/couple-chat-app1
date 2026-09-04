@@ -36,7 +36,12 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws")) {
+  // Bypass Service Worker for WebSocket connections
+  if (url.protocol === "ws:" || url.protocol === "wss:" || url.pathname.startsWith("/ws") || url.pathname.startsWith("/api/ws")) {
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(request).catch(() => caches.match(request))
     );
