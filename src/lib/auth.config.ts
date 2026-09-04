@@ -1,7 +1,9 @@
 import type { NextAuthConfig } from "next-auth";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const authConfig = {
-  trustHost: process.env.NODE_ENV !== "production",
+  trustHost: !isProduction,
   session: { strategy: "jwt" as const, maxAge: 30 * 24 * 60 * 60 },
   pages: {
     signIn: "/login",
@@ -9,12 +11,12 @@ export const authConfig = {
   providers: [],
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: isProduction ? "__Secure-next-auth.session-token" : "next-auth.session-token",
       options: {
         httpOnly: true,
-        sameSite: "strict",
+        sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: isProduction,
       },
     },
   },
