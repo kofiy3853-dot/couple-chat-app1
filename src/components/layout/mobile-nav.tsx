@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  MessageCircle,
   Camera,
   Calendar,
   User,
@@ -15,7 +14,6 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Chat", href: "/chat", icon: MessageCircle, coupleRequired: true },
   { name: "Games", href: "/games", icon: Gamepad2, coupleRequired: true },
   { name: "Memories", href: "/memories", icon: Camera, coupleRequired: true },
   { name: "Timeline", href: "/timeline", icon: Calendar, coupleRequired: true },
@@ -24,8 +22,6 @@ const navigation = [
 
 export function MobileNav({ hasCouple }: { hasCouple: boolean }) {
   const pathname = usePathname();
-
-  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
 
   const items = navigation.filter((item) => !item.coupleRequired || hasCouple);
 

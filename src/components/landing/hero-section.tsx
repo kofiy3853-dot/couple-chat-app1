@@ -82,10 +82,10 @@ export function HeroSection() {
                 </svg>
               </Link>
               <Link
-                href="/chat"
+                href="/"
                 className="inline-flex items-center justify-center gap-2 h-12 px-8 bg-transparent text-foreground font-medium rounded-lg border border-border hover:border-foreground/20 hover:bg-foreground/5 transition-all duration-200"
               >
-                Open Chat
+                Open Dashboard
               </Link>
             </>
           ) : (

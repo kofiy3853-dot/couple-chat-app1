@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/app/actions/logout";
 import {
   LayoutDashboard,
-  MessageCircle,
   Camera,
   Calendar,
   Bell,
@@ -44,7 +43,6 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Chat", href: "/chat", icon: MessageCircle, coupleRequired: true },
   { name: "Games", href: "/games", icon: Gamepad2, coupleRequired: true },
   { name: "Memories", href: "/memories", icon: Camera, coupleRequired: true },
   { name: "Timeline", href: "/timeline", icon: Calendar, coupleRequired: true },
@@ -55,8 +53,6 @@ const navigation = [
 export function Sidebar({ user, hasCouple }: SidebarProps) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
-
-  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
 
   const initials = user.name
     ?.split(" ")

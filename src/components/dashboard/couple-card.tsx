@@ -98,9 +98,9 @@ export function CoupleCard({
 
         <div className="flex gap-2">
           <Button asChild className="flex-1 bg-rose-500 hover:bg-rose-600 text-white">
-            <Link href="/chat">
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Chat
+            <Link href="/memories">
+              <Camera className="h-4 w-4 mr-2" />
+              Memories
             </Link>
           </Button>
           <Button asChild variant="outline" className="flex-1">

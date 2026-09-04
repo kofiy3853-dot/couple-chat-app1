@@ -249,11 +249,11 @@ function ConnectedDashboard({
   const quickActions = [
     {
       icon: MessageCircle,
-      label: "Send a message",
-      sub: "Open chat",
-      href: "/chat",
-      gradient: "from-rose-500 to-pink-600",
-      shadow: "shadow-rose-200",
+      label: "View memories",
+      sub: "Capture moments",
+      href: "/memories",
+      gradient: "from-violet-500 to-purple-600",
+      shadow: "shadow-violet-200",
     },
     {
       icon: Camera,
@@ -511,9 +511,9 @@ function ConnectedDashboard({
               asChild
               className="flex-1 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white shadow-md shadow-rose-100 border-0 rounded-xl h-9 text-sm"
             >
-              <Link href="/chat">
-                <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
-                Message
+              <Link href="/memories">
+                <Camera className="h-3.5 w-3.5 mr-1.5" />
+                Memories
               </Link>
             </Button>
             <Button
