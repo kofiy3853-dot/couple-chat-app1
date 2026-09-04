@@ -54,8 +54,22 @@ app.prepare().then(() => {
       return;
     }
     try {
-      pubClient = new Redis(REDIS_URL);
-      subClient = new Redis(REDIS_URL);
+      pubClient = new Redis(REDIS_URL, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      });
+      subClient = new Redis(REDIS_URL, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      });
+
+      pubClient.on("error", (err) => {
+        console.error("[WS] Redis pub client error:", err.message);
+      });
+      subClient.on("error", (err) => {
+        console.error("[WS] Redis sub client error:", err.message);
+      });
+
       io.adapter(createAdapter(pubClient, subClient));
       console.log("[WS] Redis adapter connected");
     } catch (err) {
