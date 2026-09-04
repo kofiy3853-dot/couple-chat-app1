@@ -242,8 +242,8 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   });
 
   // ─── Send message ───────────────────────────────────────────────────────
-  socket.on("send-message", async (data: { conversationId: string; content: string; type?: string; localId?: string }) => {
-    const { conversationId, content, type = "TEXT", localId } = data;
+  socket.on("send-message", async (data: { conversationId: string; content: string; type?: string; localId?: string; replyToId?: string }) => {
+    const { conversationId, content, type = "TEXT", localId, replyToId } = data;
     if (!conversationId || !content) return;
 
     const trimmed = content.trim();
@@ -265,11 +265,20 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
           senderId: userId,
           content: trimmed,
           type: msgType as "TEXT" | "IMAGE" | "AUDIO",
+          replyToId: replyToId || undefined,
         },
         include: {
           sender: { select: { id: true, name: true, image: true } },
           reactions: true,
           attachments: true,
+          replyTo: {
+            select: {
+              id: true,
+              content: true,
+              type: true,
+              sender: { select: { id: true, name: true, username: true } },
+            },
+          },
         },
       });
 

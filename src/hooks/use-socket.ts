@@ -198,8 +198,8 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   }, [conversationId, connected]);
 
   const sendMessage = useCallback(
-    (conversationId: string, content: string, type: "TEXT" | "IMAGE" = "TEXT") => {
-      clientRef.current?.sendMessage({ conversationId, content, type });
+    (conversationId: string, content: string, type: "TEXT" | "IMAGE" | "AUDIO" = "TEXT", replyToId?: string) => {
+      clientRef.current?.sendMessage({ conversationId, content, type, replyToId });
     },
     []
   );

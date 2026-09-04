@@ -44,6 +44,7 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const { data: session } = useSession();
   const currentUser = session?.user;
 
@@ -60,9 +61,7 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
     loading: messagesLoading,
     loadingMore,
     hasMore,
-    sending,
     loadMore,
-    sendMessage,
     deleteMessage,
     editMessage,
     addReaction,
@@ -78,8 +77,15 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
   });
 
   const handleNewMessage = useCallback(
-    (message: unknown) => addRealtimeMessage(message as Parameters<typeof addRealtimeMessage>[0]),
-    [addRealtimeMessage]
+    (message: unknown) => {
+      const msg = message as Parameters<typeof addRealtimeMessage>[0];
+      addRealtimeMessage(msg);
+      // Reset sending state when our own message arrives
+      if (msg.senderId === currentUser?.id) {
+        setSending(false);
+      }
+    },
+    [addRealtimeMessage, currentUser?.id]
   );
 
   const handleMarkMessageDeleted = useCallback(
@@ -110,7 +116,7 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
     connected,
     typingState,
     presenceState,
-    broadcastMessage,
+    sendMessage: socketSendMessage,
     broadcastMessageDeleted,
     broadcastMessageEdited,
     broadcastReactionToggled,
@@ -185,15 +191,14 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
           broadcastMessageEdited(editingMessage, conversationId, content);
         }
         setEditingMessage(null);
-      } else {
-        const newMessage = await sendMessage(content, "TEXT", replyingTo ?? undefined);
-        if (newMessage) {
-          broadcastMessage(newMessage);
-        }
+      } else if (conversationId) {
+        setSending(true);
+        socketSendMessage(conversationId, content, "TEXT", replyingTo ?? undefined);
         setReplyingTo(null);
+        // sending will be reset when new-message arrives via socket
       }
     },
-    [broadcastMessage, broadcastMessageEdited, conversationId, editingMessage, editMessage, sendMessage, replyingTo]
+    [broadcastMessageEdited, conversationId, editingMessage, editMessage, socketSendMessage, replyingTo]
   );
 
   const handleDelete = useCallback(
@@ -220,9 +225,8 @@ export function ChatContainer({ className, overrideConversationId }: ChatContain
   const handleAttachmentMessage = useCallback(
     (message: Parameters<typeof addRealtimeMessage>[0]) => {
       addRealtimeMessage(message);
-      broadcastMessage(message);
     },
-    [addRealtimeMessage, broadcastMessage]
+    [addRealtimeMessage]
   );
 
   if (loading) {

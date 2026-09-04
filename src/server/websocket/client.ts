@@ -156,6 +156,7 @@ class WebSocketClient {
     content: string;
     type?: "TEXT" | "IMAGE" | "AUDIO";
     localId?: string;
+    replyToId?: string;
   }): void {
     this.socket?.emit("send-message", data);
   }
