@@ -28,11 +28,8 @@ class WebSocketClient {
   }
 
   static getInstance(options: WebSocketClientOptions = {}): WebSocketClient {
-    // If a userId is supplied and the singleton lacks one, destroy and recreate
-    if (WebSocketClient.instance && options.userId && WebSocketClient.instance.userId !== options.userId) {
-      WebSocketClient.instance.disconnect();
-      WebSocketClient.instance = null;
-    }
+    // Return existing instance if available (don't destroy on userId change)
+    // The React hook manages lifecycle per userId
     if (!WebSocketClient.instance) {
       WebSocketClient.instance = new WebSocketClient(options);
     }

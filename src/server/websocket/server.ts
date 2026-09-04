@@ -6,6 +6,7 @@ import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/db";
 import type { PresenceStatus } from "@/lib/constants";
 import "dotenv/config";
+import { messageRateLimiter, typingRateLimiter, reactionRateLimiter, gameRateLimiter, connectionRateLimiter } from "./rate-limiter";
 
 // Render passes the PORT environment variable dynamically for Web Services
 const PORT = parseInt(process.env.PORT || process.env.WS_PORT || "3001", 10);
@@ -115,11 +116,18 @@ io.use(async (socket: AuthenticatedSocket, next) => {
       secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
     });
 
-    if (!token?.id) {
+if (!token?.id) {
       return next(new Error("Unauthorized: invalid session"));
     }
 
     const userId = token.id as string;
+
+    // Verify the claimed userId matches the session (prevents impersonation via handshake auth/query)
+    const claimedUserId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+    if (claimedUserId && claimedUserId !== userId) {
+      return next(new Error("Unauthorized: user ID mismatch"));
+    }
+
     const dbUser = await db.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true },
@@ -149,7 +157,9 @@ async function setOnline(userId: string) {
       await pubClient.set(`online:${userId}`, "1", "EX", 300);
       await pubClient.sadd("online_users", userId);
     }
-  } catch {}
+  } catch (err) {
+    console.error("[WS] Failed to set user online:", err);
+  }
 }
 
 async function setOffline(userId: string) {
@@ -158,7 +168,9 @@ async function setOffline(userId: string) {
       await pubClient.del(`online:${userId}`);
       await pubClient.srem("online_users", userId);
     }
-  } catch {}
+  } catch (err) {
+    console.error("[WS] Failed to set user offline:", err);
+  }
 }
 
 async function setPresenceStatus(userId: string, status: PresenceStatus) {
@@ -167,7 +179,9 @@ async function setPresenceStatus(userId: string, status: PresenceStatus) {
     if (pubClient) {
       await pubClient.set(`presence:${userId}`, status, "EX", 300);
     }
-  } catch {}
+  } catch (err) {
+    console.error("[WS] Failed to set presence status:", err);
+  }
 }
 
 async function clearPresenceStatus(userId: string) {
@@ -176,7 +190,9 @@ async function clearPresenceStatus(userId: string) {
     if (pubClient) {
       await pubClient.del(`presence:${userId}`);
     }
-  } catch {}
+  } catch (err) {
+    console.error("[WS] Failed to clear presence status:", err);
+  }
 }
 
 async function getFullPresenceSnapshot(): Promise<Record<string, PresenceStatus>> {
@@ -210,6 +226,14 @@ async function getFullPresenceSnapshot(): Promise<Record<string, PresenceStatus>
 io.on("connection", async (socket: AuthenticatedSocket) => {
   const userId = socket.userId!;
   const userName = socket.userName!;
+
+  // Connection rate limit
+  const connLimit = connectionRateLimiter(`conn:${userId}`);
+  if (!connLimit.allowed) {
+    console.warn(`[WS] Connection rate limit exceeded for user ${userId}`);
+    socket.disconnect();
+    return;
+  }
 
   console.log(`[WS] ${userName} connected (${socket.id})`);
 
@@ -261,11 +285,26 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, content, type = "TEXT", localId, replyToId } = data;
     if (!conversationId || !content) return;
 
-    const trimmed = content.trim();
-    if (trimmed.length === 0 || trimmed.length > 5000) return;
+    // Rate limit: 10 messages/second per user
+    const msgLimit = messageRateLimiter(`msg:${userId}`);
+    if (!msgLimit.allowed) {
+      socket.emit("error", { message: "Rate limit exceeded" });
+      return;
+    }
 
+    // Sanitize content
+    const trimmed = content.trim().slice(0, 5000);
+    if (trimmed.length === 0) return;
+
+    // Validate type
     const validTypes = ["TEXT", "IMAGE", "AUDIO"];
     const msgType = validTypes.includes(type) ? type : "TEXT";
+
+    // Validate replyToId if provided (UUID format)
+    if (replyToId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(replyToId)) {
+      socket.emit("error", { message: "Invalid replyToId" });
+      return;
+    }
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) {
@@ -359,6 +398,11 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   // ─── Typing ─────────────────────────────────────────────────────────────
   socket.on("typing-start", async (data: { conversationId: string }) => {
     if (!data.conversationId) return;
+    
+    // Rate limit: 5 typing events/second per user
+    const typeLimit = typingRateLimiter(`type:${userId}`);
+    if (!typeLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, data.conversationId);
     if (!isMember) return;
     socket.to(`conversation:${data.conversationId}`).emit("typing-start", { userId, userName, conversationId: data.conversationId });
@@ -366,6 +410,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 
   socket.on("typing-stop", async (data: { conversationId: string }) => {
     if (!data.conversationId) return;
+    
+    const typeLimit = typingRateLimiter(`type:${userId}`);
+    if (!typeLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, data.conversationId);
     if (!isMember) return;
     socket.to(`conversation:${data.conversationId}`).emit("typing-stop", { userId, conversationId: data.conversationId });
@@ -409,6 +457,14 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("reaction-added", async (data: { messageId: string; conversationId: string; emoji: string }) => {
     const { messageId, conversationId, emoji } = data;
     if (!messageId || !conversationId || !emoji) return;
+
+    // Rate limit: 20 reactions/second per user
+    const reactLimit = reactionRateLimiter(`react:${userId}`);
+    if (!reactLimit.allowed) return;
+
+    // Validate emoji (single codepoint, reasonable length)
+    if (emoji.length > 8 || [...emoji].length !== 1) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("reaction-added", { messageId, userId, userName, emoji });
@@ -417,6 +473,12 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("reaction-removed", async (data: { messageId: string; conversationId: string; emoji: string }) => {
     const { messageId, conversationId, emoji } = data;
     if (!messageId || !conversationId || !emoji) return;
+
+    const reactLimit = reactionRateLimiter(`react:${userId}`);
+    if (!reactLimit.allowed) return;
+
+    if (emoji.length > 8 || [...emoji].length !== 1) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("reaction-removed", { messageId, userId, emoji });
@@ -448,6 +510,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("game-start", async (data: { conversationId: string; type: "truth" | "dare" }) => {
     const { conversationId, type } = data;
     if (!conversationId || !type) return;
+
+    const gameLimit = gameRateLimiter(`game:${userId}`);
+    if (!gameLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("game-challenge-received", { fromUserId: userId, fromUserName: userName, type });
@@ -456,6 +522,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("game-choice", async (data: { conversationId: string; type: "truth" | "dare" }) => {
     const { conversationId, type } = data;
     if (!conversationId || !type) return;
+
+    const gameLimit = gameRateLimiter(`game:${userId}`);
+    if (!gameLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("game-choice-made", { fromUserId: userId, fromUserName: userName, type });
@@ -464,6 +534,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("game-question", async (data: { conversationId: string; question: string; type: "truth" | "dare" }) => {
     const { conversationId, question, type } = data;
     if (!conversationId || !question) return;
+
+    const gameLimit = gameRateLimiter(`game:${userId}`);
+    if (!gameLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("game-question-received", { fromUserId: userId, fromUserName: userName, question, type });
@@ -472,6 +546,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("game-answer", async (data: { conversationId: string; completed: boolean }) => {
     const { conversationId, completed } = data;
     if (!conversationId) return;
+
+    const gameLimit = gameRateLimiter(`game:${userId}`);
+    if (!gameLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("game-answer-result", { fromUserId: userId, fromUserName: userName, completed });
@@ -480,6 +558,10 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("game-end", async (data: { conversationId: string }) => {
     const { conversationId } = data;
     if (!conversationId) return;
+
+    const gameLimit = gameRateLimiter(`game:${userId}`);
+    if (!gameLimit.allowed) return;
+
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
     io.to(`conversation:${conversationId}`).emit("game-ended", { fromUserId: userId });
@@ -490,14 +572,21 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     console.log(`[WS] ${userName} disconnected (${socket.id}): ${reason}`);
 
     const sockets = onlineUsers.get(userId);
-    if (sockets) {
-      sockets.delete(socket.id);
-      if (sockets.size === 0) {
-        onlineUsers.delete(userId);
-        await clearPresenceStatus(userId);
-        await setOffline(userId);
-        socket.broadcast.emit("user-offline", { userId });
-      }
+    if (!sockets) {
+      userRooms.delete(socket.id);
+      return;
+    }
+
+    const remaining = sockets.size - 1;
+    sockets.delete(socket.id);
+
+    // Only go offline if this was the last socket for this user
+    // Use a small delay to allow concurrent disconnects to process
+    if (remaining <= 0) {
+      onlineUsers.delete(userId);
+      await clearPresenceStatus(userId);
+      await setOffline(userId);
+      socket.broadcast.emit("user-offline", { userId });
     }
     userRooms.delete(socket.id);
   });
