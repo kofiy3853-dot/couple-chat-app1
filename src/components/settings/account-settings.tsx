@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarUpload } from "@/components/ui/avatar-upload";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Camera, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -140,23 +140,12 @@ export function AccountSettings({ profile, couple, onUpdate }: AccountSettingsPr
           <CardDescription>Update your personal information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={image || undefined} alt={name || "User"} />
-              <AvatarFallback className="bg-rose-100 text-rose-600 text-xl font-semibold">
-                {name?.charAt(0)?.toUpperCase() ?? "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="space-y-1">
-              <Label htmlFor="image">Profile Image URL</Label>
-              <Input
-                id="image"
-                placeholder="https://example.com/image.jpg"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-              />
-            </div>
-          </div>
+          <AvatarUpload
+            currentImage={image}
+            name={name}
+            onUpload={(url) => setImage(url)}
+            onRemove={() => setImage("")}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
