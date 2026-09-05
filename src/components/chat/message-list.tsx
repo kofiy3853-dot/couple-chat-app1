@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { Loader2, ArrowDown } from "lucide-react";
 import { MessageItem } from "./message-item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/lib/utils";
 import type { Message } from "@/hooks/use-chat";
 
 interface MessageListProps {
@@ -126,17 +127,32 @@ export function MessageList({
           const prevMessage = index > 0 ? messages[index - 1] : null;
           const showSender = !prevMessage || prevMessage.senderId !== message.senderId;
 
+          // Show date separator if messages are from different days
+          const msgDate = new Date(message.createdAt).toDateString();
+          const prevDate = prevMessage ? new Date(prevMessage.createdAt).toDateString() : null;
+          const showDateSeparator = msgDate !== prevDate;
+
           return (
-            <MessageItem
-              key={message.id}
-              message={message}
-              isOwn={message.senderId === currentUserId}
-              showSender={showSender}
-              onReply={onReply}
-              onReact={onReact}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
+            <div key={message.id}>
+              {showDateSeparator && (
+                <div className="flex items-center justify-center py-3">
+                  <div className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {formatDate(message.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <MessageItem
+                message={message}
+                isOwn={message.senderId === currentUserId}
+                showSender={showSender}
+                onReply={onReply}
+                onReact={onReact}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            </div>
           );
         })}
       </div>
