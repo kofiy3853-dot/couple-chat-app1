@@ -45,52 +45,54 @@ export function AvatarUpload({ currentImage, name, onUpload, onRemove }: AvatarU
 
   return (
     <div className="flex items-center gap-4">
-      <div className="relative group">
+      <div className="relative">
         <Avatar className="h-20 w-20">
           <AvatarImage src={displayImage || undefined} alt={name || "User"} />
           <AvatarFallback className="bg-rose-100 text-rose-600 text-xl font-semibold">
             {name?.charAt(0)?.toUpperCase() ?? "U"}
           </AvatarFallback>
         </Avatar>
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
-        >
-          {uploading ? (
-            <Loader2 className="h-5 w-5 text-white animate-spin" />
-          ) : (
-            <Camera className="h-5 w-5 text-white" />
-          )}
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
       </div>
 
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {currentImage ? "Change photo" : "Upload photo"}
-        </p>
-        <p className="text-xs text-gray-500">JPEG, PNG, GIF or WebP. Max 2MB.</p>
-        {currentImage && (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={() => { setPreview(null); onRemove(); }}
-            className="text-red-500 hover:text-red-600 h-7 px-2"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="h-8"
           >
-            <X className="h-3 w-3 mr-1" />
-            Remove
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Camera className="h-4 w-4 mr-1" />
+            )}
+            {currentImage ? "Change" : "Upload"}
           </Button>
-        )}
+
+          {currentImage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setPreview(null); onRemove(); }}
+              className="text-red-500 hover:text-red-600 h-8"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Remove
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-gray-500">JPEG, PNG, GIF or WebP. Max 2MB.</p>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
     </div>
   );
 }

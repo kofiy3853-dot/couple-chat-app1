@@ -11,7 +11,7 @@ interface MessageInputProps {
   onTypingStart: () => void;
   onTypingStop: () => void;
   onVoiceRecording?: (blob: Blob) => void;
-  onAttachment?: () => void;
+  onAttachment?: (file: File) => void;
   replyTo?: { id: string; content: string; senderName: string } | null;
   onCancelReply?: () => void;
   sending: boolean;
@@ -181,7 +181,7 @@ export function MessageInput({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  onAttachment?.();
+                  onAttachment?.(file);
                   e.target.value = "";
                 }
               }}

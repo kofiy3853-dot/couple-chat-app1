@@ -73,6 +73,22 @@ export function ChatPageClient({
     setReplyTo(null);
   };
 
+  const handleAttachment = async (file: File) => {
+    if (!conversationId) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) {
+        const type = file.type.startsWith("audio/") ? "AUDIO" : "IMAGE";
+        wsSendMessage(conversationId, data.data.url, type);
+      }
+    } catch {
+      // upload failed
+    }
+  };
+
   const handleReact = async (messageId: string, emoji: string) => {
     if (!conversationId) return;
     const result = await addReaction(messageId, emoji);
@@ -127,6 +143,7 @@ export function ChatPageClient({
 
       <MessageInput
         onSend={handleSend}
+        onAttachment={handleAttachment}
         onTypingStart={() => conversationId && startTyping(conversationId)}
         onTypingStop={() => conversationId && stopTyping(conversationId)}
         replyTo={replyTo ? { id: replyTo.id, content: replyTo.content, senderName: replyTo.sender.name || "Someone" } : null}
