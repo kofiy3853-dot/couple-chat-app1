@@ -129,7 +129,7 @@ export function MessageInput({
   };
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+    <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 safe-area-bottom">
       {replyTo && (
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
           <div className="flex-1 min-w-0 border-l-2 border-rose-400 pl-2">

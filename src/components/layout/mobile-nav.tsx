@@ -25,6 +25,8 @@ const navigation = [
 export function MobileNav({ hasCouple }: { hasCouple: boolean }) {
   const pathname = usePathname();
 
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
+
   const items = navigation.filter((item) => !item.coupleRequired || hasCouple);
 
   return (

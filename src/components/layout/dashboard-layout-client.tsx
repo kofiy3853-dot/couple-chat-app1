@@ -19,7 +19,7 @@ export function MainContentWrapper({ children }: { children: React.ReactNode }) 
   const isChat = pathname === "/chat" || pathname.startsWith("/chat/");
 
   return (
-    <div className={isChat ? "flex flex-col h-screen" : "lg:pl-64 flex flex-col h-screen"}>
+    <div className={isChat ? "flex flex-col h-screen lg:pl-64" : "lg:pl-64 flex flex-col h-screen"}>
       {children}
     </div>
   );

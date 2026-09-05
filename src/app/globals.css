@@ -172,3 +172,20 @@ body {
 .animate-scale-in {
   opacity: 0;
 }
+
+/* iOS safe area */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent rubber-banding on iOS */
+html, body {
+  overscroll-behavior: none;
+}
+
+/* Ensure chat takes full mobile viewport */
+@supports (height: 100dvh) {
+  .h-dvh {
+    height: 100dvh;
+  }
+}

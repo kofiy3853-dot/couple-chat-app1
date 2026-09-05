@@ -92,7 +92,12 @@ export function MessageItem({
           </Avatar>
         )}
 
-        <div className={cn("flex flex-col", isOwn ? "items-end" : "items-start")}>
+        <div
+          className={cn("flex flex-col", isOwn ? "items-end" : "items-start")}
+          onClick={() => {
+            if (!showActions) setShowActions(true);
+          }}
+        >
           {showSender && !isOwn && (
             <span className="text-xs text-gray-500 dark:text-gray-400 mb-1 px-1">
               {message.sender.name || "Someone"}
@@ -231,7 +236,12 @@ export function MessageItem({
           )}
         </div>
 
-        <div className="flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div
+          className={cn(
+            "flex flex-col items-center gap-1 shrink-0",
+            showActions ? "opacity-100" : "opacity-0 sm:group-hover:opacity-100 transition-opacity"
+          )}
+        >
           <button
             onClick={() => setShowActions(!showActions)}
             className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"

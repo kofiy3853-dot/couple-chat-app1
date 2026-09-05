@@ -196,7 +196,7 @@ export function ChatPageClient({
   const partnerPresence = partnerUserId ? (presenceState[partnerUserId] ?? "offline") : "offline";
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-950">
+    <div className="flex flex-col h-dvh sm:h-full bg-white dark:bg-gray-950">
       <ChatHeader
         partnerName={partnerName}
         partnerImage={partnerImage}
