@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,9 +78,10 @@ interface TruthOrDareProps {
   userId: string;
   connected: boolean;
   socketActions: SocketActions;
+  onRegisterHandlers: (key: string, fn: (...args: unknown[]) => void) => void;
 }
 
-export function TruthOrDare({ onBack, conversationId, userId, connected, socketActions }: TruthOrDareProps) {
+export function TruthOrDare({ onBack, conversationId, userId, connected, socketActions, onRegisterHandlers }: TruthOrDareProps) {
   const [phase, setPhase] = useState<GamePhase>("idle");
   const [myScore, setMyScore] = useState(0);
   const [partnerScore, setPartnerScore] = useState(0);
@@ -89,48 +90,46 @@ export function TruthOrDare({ onBack, conversationId, userId, connected, socketA
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState("");
   const [lastResult, setLastResult] = useState<{ completed: boolean; by: string } | null>(null);
-  const hasListeners = useRef(false);
 
-  // Socket event handlers
-  const handleGameChallenge = useCallback((data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
-    if (data.fromUserId === userId) return;
-    setPartnerName(data.fromUserName);
-    setChallengeType(data.type);
-    setPhase("partner-sent-choice");
-  }, [userId]);
-
-  const handleGameChoice = useCallback((data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
-    if (data.fromUserId === userId) return;
-    setChallengeType(data.type);
-    setPhase("pick-question");
-  }, [userId]);
-
-  const handleGameQuestion = useCallback((data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => {
-    if (data.fromUserId === userId) return;
-    setSelectedQuestion(data.question);
-    setChallengeType(data.type);
-    setPartnerName(data.fromUserName);
-    setPhase("received-question");
-  }, [userId]);
-
-  const handleGameAnswer = useCallback((data: { fromUserId: string; fromUserName: string; completed: boolean }) => {
-    if (data.fromUserId === userId) return;
-    setLastResult({ completed: data.completed, by: data.fromUserName });
-    if (data.completed) setPartnerScore((s) => s + 1);
-    setPhase("round-result");
-  }, [userId]);
-
-  const handleGameEnded = useCallback((data: { fromUserId: string }) => {
-    if (data.fromUserId === userId) return;
-    setPhase("game-over");
-  }, [userId]);
-
-  // Re-register callbacks when they change
-  const gamePage = document.querySelector('[data-game-page="truth-or-dare"]');
   useEffect(() => {
-    // This is a workaround - the GamesPage already registers the listeners
-    // We just need to update the refs
-  }, [handleGameChallenge, handleGameChoice, handleGameQuestion, handleGameAnswer, handleGameEnded]);
+    onRegisterHandlers("onGameChallengeReceived", (data: unknown) => {
+      const d = data as { fromUserId: string; fromUserName: string; type: "truth" | "dare" };
+      if (d.fromUserId === userId) return;
+      setPartnerName(d.fromUserName);
+      setChallengeType(d.type);
+      setPhase("partner-sent-choice");
+    });
+
+    onRegisterHandlers("onGameChoiceMade", (data: unknown) => {
+      const d = data as { fromUserId: string; fromUserName: string; type: "truth" | "dare" };
+      if (d.fromUserId === userId) return;
+      setChallengeType(d.type);
+      setPhase("pick-question");
+    });
+
+    onRegisterHandlers("onGameQuestionReceived", (data: unknown) => {
+      const d = data as { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" };
+      if (d.fromUserId === userId) return;
+      setSelectedQuestion(d.question);
+      setChallengeType(d.type);
+      setPartnerName(d.fromUserName);
+      setPhase("received-question");
+    });
+
+    onRegisterHandlers("onGameAnswerResult", (data: unknown) => {
+      const d = data as { fromUserId: string; fromUserName: string; completed: boolean };
+      if (d.fromUserId === userId) return;
+      setLastResult({ completed: d.completed, by: d.fromUserName });
+      if (d.completed) setPartnerScore((s) => s + 1);
+      setPhase("round-result");
+    });
+
+    onRegisterHandlers("onGameEnded", (data: unknown) => {
+      const d = data as { fromUserId: string };
+      if (d.fromUserId === userId) return;
+      setPhase("game-over");
+    });
+  }, [userId, onRegisterHandlers]);
 
   if (!conversationId) {
     return (

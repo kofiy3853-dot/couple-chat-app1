@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Flame, HelpCircle, GitBranch, Star, Brain, Sparkles, Loader2 } from "lucide-react";
@@ -62,12 +62,27 @@ const games = [
   },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GameHandlers = Record<string, (...args: any[]) => void>;
+
 export function GamesPage() {
   const [activeGame, setActiveGame] = useState<GameId>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
   const userId = session?.user?.id || "";
+
+  const handlersRef = useRef<GameHandlers>({
+    onGameChallengeReceived: () => {},
+    onGameChoiceMade: () => {},
+    onGameQuestionReceived: () => {},
+    onGameAnswerResult: () => {},
+    onGameEnded: () => {},
+  });
+
+  const updateHandler = useCallback((key: string, fn: (...args: unknown[]) => void) => {
+    handlersRef.current[key] = fn;
+  }, []);
 
   useEffect(() => {
     async function fetchCouple() {
@@ -87,11 +102,26 @@ export function GamesPage() {
   }, [userId]);
 
   const handleNewMessage = useCallback(() => {}, []);
-  const handleGameChallenge = useCallback(() => {}, []);
-  const handleGameChoice = useCallback(() => {}, []);
-  const handleGameQuestion = useCallback(() => {}, []);
-  const handleGameAnswer = useCallback(() => {}, []);
-  const handleGameEnded = useCallback(() => {}, []);
+
+  const handleGameChallenge = useCallback((data: unknown) => {
+    handlersRef.current.onGameChallengeReceived(data);
+  }, []);
+
+  const handleGameChoice = useCallback((data: unknown) => {
+    handlersRef.current.onGameChoiceMade(data);
+  }, []);
+
+  const handleGameQuestion = useCallback((data: unknown) => {
+    handlersRef.current.onGameQuestionReceived(data);
+  }, []);
+
+  const handleGameAnswer = useCallback((data: unknown) => {
+    handlersRef.current.onGameAnswerResult(data);
+  }, []);
+
+  const handleGameEnded = useCallback((data: unknown) => {
+    handlersRef.current.onGameEnded(data);
+  }, []);
 
   const {
     connected,
@@ -131,6 +161,7 @@ export function GamesPage() {
             userId={userId}
             connected={connected}
             socketActions={{ startGame, makeChoice, sendQuestion, sendAnswer, endGame }}
+            onRegisterHandlers={updateHandler}
           />
         );
       case "couples-quiz":
