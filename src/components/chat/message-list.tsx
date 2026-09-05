@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { Loader2, ArrowDown } from "lucide-react";
 import { MessageItem } from "./message-item";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Message } from "@/hooks/use-chat";
@@ -34,6 +34,7 @@ export function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({
@@ -53,7 +54,9 @@ export function MessageList({
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
+      const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+      isAtBottomRef.current = atBottom;
+      setShowScrollDown(!atBottom);
     };
 
     container.addEventListener("scroll", handleScroll);
@@ -133,6 +136,15 @@ export function MessageList({
       </div>
 
       <div ref={bottomRef} />
+
+      {showScrollDown && (
+        <button
+          onClick={() => scrollToBottom(true)}
+          className="fixed bottom-24 right-6 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          <ArrowDown className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+        </button>
+      )}
     </div>
   );
 }

@@ -24,6 +24,7 @@ export function ChatPageClient({
   partnerUserId,
 }: ChatPageClientProps) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const {
     messages,
@@ -75,6 +76,7 @@ export function ChatPageClient({
 
   const handleAttachment = async (file: File) => {
     if (!conversationId) return;
+    setUploadError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -83,9 +85,13 @@ export function ChatPageClient({
       if (data.success) {
         const type = file.type.startsWith("audio/") ? "AUDIO" : "IMAGE";
         wsSendMessage(conversationId, data.data.url, type);
+      } else {
+        setUploadError(data.error?.message || "Upload failed");
+        setTimeout(() => setUploadError(null), 3000);
       }
     } catch {
-      // upload failed
+      setUploadError("Upload failed. Check your connection.");
+      setTimeout(() => setUploadError(null), 3000);
     }
   };
 
@@ -103,6 +109,7 @@ export function ChatPageClient({
     if (success) {
       broadcastMessageEdited(messageId, conversationId, content);
     }
+    return success;
   };
 
   const handleDelete = async (messageId: string) => {
@@ -111,6 +118,7 @@ export function ChatPageClient({
     if (success) {
       broadcastMessageDeleted(messageId, conversationId);
     }
+    return success;
   };
 
   if (!conversationId) {
@@ -140,6 +148,12 @@ export function ChatPageClient({
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
+
+      {uploadError && (
+        <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+          <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>
+        </div>
+      )}
 
       <MessageInput
         onSend={handleSend}

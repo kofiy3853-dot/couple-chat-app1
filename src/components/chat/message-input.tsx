@@ -47,10 +47,13 @@ export function MessageInput({
   const handleInput = (value: string) => {
     setContent(value);
 
-    onTypingStart();
+    if (!typingTimeoutRef.current) {
+      onTypingStart();
+    }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       onTypingStop();
+      typingTimeoutRef.current = null;
     }, 2000);
 
     textareaRef.current?.scrollIntoView({ block: "nearest" });

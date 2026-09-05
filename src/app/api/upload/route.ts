@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB (base64 adds ~33% overhead)
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "audio/webm", "audio/mp3", "audio/mpeg", "audio/ogg", "audio/wav"];
 
 export async function POST(request: NextRequest) {
   try {

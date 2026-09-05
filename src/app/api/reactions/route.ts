@@ -30,13 +30,12 @@ export async function POST(request: NextRequest) {
 
     await assertMessageAccess(messageId, user.id);
 
-    // Use upsert to avoid TOCTOU race condition
-    const existing = await db.messageReaction.findUnique({
-      where: { messageId_userId_emoji: { messageId, userId: user.id, emoji } },
+    // Atomic toggle: try delete first, if no rows deleted then create
+    const deleted = await db.messageReaction.deleteMany({
+      where: { messageId, userId: user.id, emoji },
     });
 
-    if (existing) {
-      await db.messageReaction.delete({ where: { id: existing.id } });
+    if (deleted.count > 0) {
       return successResponse({ removed: true });
     }
 

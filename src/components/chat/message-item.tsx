@@ -31,6 +31,7 @@ export function MessageItem({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isDeleted = !!message.deletedAt;
 
@@ -214,7 +215,7 @@ export function MessageItem({
                 />
               )}
 
-              {isOwn && (
+                  {isOwn && (
                 <>
                   <button
                     onClick={() => {
@@ -226,29 +227,45 @@ export function MessageItem({
                   >
                     <Pencil className="h-4 w-4 text-gray-400" />
                   </button>
-                  <button
-                    onClick={() => {
-                      onDelete(message.id);
-                      setShowActions(false);
-                    }}
-                    className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-400" />
-                  </button>
+                  {confirmDelete ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          onDelete(message.id);
+                          setConfirmDelete(false);
+                          setShowActions(false);
+                        }}
+                        className="px-2 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="px-2 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-400" />
+                    </button>
+                  )}
                 </>
               )}
 
-              {!isOwn && (
-                <button
-                  onClick={() => {
-                    onReply(message);
-                    setShowActions(false);
-                  }}
-                  className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs"
-                >
-                  Reply
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  onReply(message);
+                  setShowActions(false);
+                }}
+                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs"
+              >
+                Reply
+              </button>
             </div>
           )}
         </div>
