@@ -42,6 +42,13 @@ interface Memory {
   date: string;
 }
 
+interface TimelineEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  date: string;
+}
+
 interface DashboardContentProps {
   userName: string;
   partner: Partner;
@@ -51,6 +58,7 @@ interface DashboardContentProps {
   conversationId: string | null;
   recentMessages: Message[];
   recentMemories: Memory[];
+  recentTimelineEvents: TimelineEvent[];
   unreadNotifications: number;
   anniversaryDate: string | null;
 }
@@ -64,6 +72,7 @@ export function DashboardContent({
   conversationId,
   recentMessages,
   recentMemories,
+  recentTimelineEvents,
   unreadNotifications,
   anniversaryDate,
 }: DashboardContentProps) {
@@ -192,7 +201,7 @@ export function DashboardContent({
         {/* Right Column - Sidebar Content */}
         <div className="space-y-6">
           <MemoriesPreview memories={recentMemories} />
-          <TimelinePreview />
+          <TimelinePreview events={recentTimelineEvents} />
           <NotificationsPreview unreadCount={unreadNotifications} />
         </div>
       </div>

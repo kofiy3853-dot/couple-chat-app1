@@ -78,8 +78,8 @@ export function QuickChatCard({
             size="sm"
             className="bg-rose-500 hover:bg-rose-600 text-white mt-1"
           >
-            <Link href="/">
-              Open Dashboard
+            <Link href="/chat">
+              Open Chat
               <ArrowRight className="h-4 w-4 ml-1" />
             </Link>
           </Button>

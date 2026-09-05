@@ -66,8 +66,8 @@ export function RecentMessages({ messages, conversationId }: RecentMessagesProps
               Start a conversation with your partner to see messages here.
             </p>
             <Button asChild size="sm" className="bg-rose-500 hover:bg-rose-600 text-white">
-              <Link href="/">
-                View Dashboard
+              <Link href="/chat">
+                Open Chat
                 <ArrowRight className="h-3 w-3 ml-1" />
               </Link>
             </Button>
@@ -86,7 +86,7 @@ export function RecentMessages({ messages, conversationId }: RecentMessagesProps
         </CardTitle>
         {conversationId && (
           <Link
-            href="/"
+            href="/chat"
             className="text-sm text-rose-500 hover:text-rose-600 flex items-center gap-1"
           >
             View all
