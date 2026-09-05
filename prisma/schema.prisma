@@ -247,6 +247,7 @@ model UserPrivacySetting {
   reactionNotifications  Boolean @default(true)
   invitationNotifications Boolean @default(true)
   memoryNotifications    Boolean @default(true)
+  timelineNotifications  Boolean @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 import { ValidationError, ForbiddenError } from "@/lib/errors";
 import { timelineSchema } from "@/lib/validation";
+import { createNotificationMany } from "@/lib/notification-helpers";
 
 async function getCoupleId(userId: string) {
   const member = await db.coupleMember.findFirst({
@@ -98,15 +99,13 @@ export async function POST(request: NextRequest) {
         .map((m: { userId: string }) => m.userId)
         .filter((id: string) => id !== user.id);
 
-      await db.notification.createMany({
-        data: partnerIds.map((partnerId: string) => ({
-          userId: partnerId,
-          type: "TIMELINE",
-          title: "New Timeline Event",
-          message: `${user.name ?? "Your partner"} added a timeline event: ${event.title}`,
-          link: `/timeline/${event.id}`,
-        })),
-      });
+      await createNotificationMany(
+        partnerIds,
+        "TIMELINE",
+        "New Timeline Event",
+        `${user.name ?? "Your partner"} added a timeline event: ${event.title}`,
+        `/timeline/${event.id}`,
+      );
     }
 
     return successResponse(event, 201);

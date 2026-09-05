@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Notification } from "./notifications-page";
+import { useNotificationStore } from "@/stores/notification-store";
 
-function getIconBg(type: Notification["type"]) {
+function getIconBg(type: string) {
   switch (type) {
     case "MESSAGE":
       return "bg-blue-50 dark:bg-blue-900/20";
@@ -24,14 +23,14 @@ function getIconBg(type: Notification["type"]) {
   }
 }
 
-function getIcon(type: Notification["type"]) {
+function getIcon(type: string) {
   const cls = "h-3.5 w-3.5";
   switch (type) {
     case "MESSAGE":
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
         </svg>
       );
     case "REACTION":
@@ -84,78 +83,79 @@ function timeAgo(dateStr: string): string {
 }
 
 export function NotificationBell() {
-  const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    notifications,
+    unreadCount,
+    setNotifications,
+    addNotification,
+    markAsRead,
+    markAllAsRead,
+  } = useNotificationStore();
+  const [isOpen, toggleOpen] = useReducer((prev: boolean) => !prev, false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
-  async function fetchNotifications() {
-    try {
-      const res = await fetch("/api/notifications");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.data?.slice(0, 10) ?? []);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    fetchNotifications();
-
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
+    async function fetchNotifications() {
+      try {
+        const res = await fetch("/api/notifications");
+        if (res.ok) {
+          const data = await res.json();
+          setNotifications((data.data ?? []).slice(0, 10));
+        }
+      } catch {
+        // silently fail
       }
     }
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchNotifications();
+    }
+  }, [setNotifications]);
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  async function markAsRead(id: string) {
+  async function handleMarkAsRead(id: string) {
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [id] }),
       });
-
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
+      markAsRead(id);
     } catch {
       // silently fail
     }
   }
 
-  async function markAllRead() {
+  async function handleMarkAllRead() {
+    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
     try {
-      const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
-      if (unreadIds.length === 0) return;
-
       await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: unreadIds }),
       });
-
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      markAllAsRead();
     } catch {
       // silently fail
     }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        if (isOpen) toggleOpen();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggleOpen}
         className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
       >
         <Bell className="h-5 w-5" />
@@ -166,7 +166,7 @@ export function NotificationBell() {
         )}
       </button>
 
-      {open && (
+      {isOpen && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border bg-card shadow-lg z-50">
           <div className="flex items-center justify-between p-3 border-b">
             <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">
@@ -174,7 +174,7 @@ export function NotificationBell() {
             </h3>
             {unreadCount > 0 && (
               <button
-                onClick={markAllRead}
+                onClick={handleMarkAllRead}
                 className="text-xs text-rose-500 hover:text-rose-600 flex items-center gap-1"
               >
                 <CheckCheck className="h-3 w-3" />
@@ -183,19 +183,7 @@ export function NotificationBell() {
             )}
           </div>
 
-          {loading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-3/4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                    <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : notifications.length === 0 ? (
+          {notifications.length === 0 ? (
             <div className="p-6 text-center">
               <Bell className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -209,8 +197,8 @@ export function NotificationBell() {
                   <button
                     key={notification.id}
                     onClick={() => {
-                      markAsRead(notification.id);
-                      setOpen(false);
+                      handleMarkAsRead(notification.id);
+                      toggleOpen();
                       if (notification.link) router.push(notification.link);
                     }}
                     className={cn(
@@ -254,7 +242,7 @@ export function NotificationBell() {
 
               <button
                 onClick={() => {
-                  setOpen(false);
+                  toggleOpen();
                   router.push("/notifications");
                 }}
                 className="w-full flex items-center justify-center gap-1 p-3 text-sm text-rose-500 hover:text-rose-600 border-t font-medium"

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 import { ValidationError, ConflictError } from "@/lib/errors";
+import { createNotification } from "@/lib/notification-helpers";
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,8 +98,20 @@ export async function POST(request: NextRequest) {
         data: { usedById: user.id },
       });
 
-      return { success: true };
+      return { success: true, creatorId: lockedInvitation.creatorId };
     });
+
+    // Notify invitation creator
+    if (result.creatorId) {
+      const acceptorName = user.name || user.username || "Someone";
+      await createNotification({
+        userId: result.creatorId,
+        type: "INVITATION",
+        title: "Invitation Accepted",
+        message: `${acceptorName} accepted your couple invitation`,
+        link: "/dashboard",
+      });
+    }
 
     return successResponse({ message: "Invitation accepted successfully" });
   } catch (error) {

@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageSquare, Heart, UserPlus, Image } from "lucide-react";
+import { Loader2, MessageSquare, Heart, UserPlus, Image, Calendar } from "lucide-react";
 
 interface NotificationPreferences {
   messageNotifications: boolean;
   reactionNotifications: boolean;
   invitationNotifications: boolean;
   memoryNotifications: boolean;
+  timelineNotifications: boolean;
 }
 
 export function NotificationSettings() {
@@ -19,6 +20,7 @@ export function NotificationSettings() {
     reactionNotifications: true,
     invitationNotifications: true,
     memoryNotifications: true,
+    timelineNotifications: true,
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -152,6 +154,24 @@ export function NotificationSettings() {
             <Switch
               checked={preferences.memoryNotifications}
               onCheckedChange={(checked) => handleToggle("memoryNotifications", checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50 dark:bg-rose-950/50">
+                <Calendar className="h-5 w-5 text-rose-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Timeline notifications</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Get notified when timeline events are added
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={preferences.timelineNotifications}
+              onCheckedChange={(checked) => handleToggle("timelineNotifications", checked)}
             />
           </div>
         </CardContent>

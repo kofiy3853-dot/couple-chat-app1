@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationItem } from "./notification-item";
+import { useNotificationStore } from "@/stores/notification-store";
 
 export interface Notification {
   id: string;
-  type: "MESSAGE" | "INVITATION" | "REACTION" | "MEMORY" | "TIMELINE";
+  type: string;
   title: string;
   message: string;
   read: boolean;
@@ -18,57 +19,54 @@ export interface Notification {
 }
 
 export function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notifications, setNotifications, markAsRead, markAllAsRead } =
+    useNotificationStore();
   const [loading, setLoading] = useState(true);
-
-  async function fetchNotifications() {
-    try {
-      const res = await fetch("/api/notifications");
-      if (res.ok) {
-        const json = await res.json();
-        setNotifications(json.data ?? []);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    async function fetchNotifications() {
+      try {
+        const res = await fetch("/api/notifications");
+        if (res.ok) {
+          const json = await res.json();
+          setNotifications(json.data ?? []);
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchNotifications();
+    }
+  }, [setNotifications]);
 
-  async function markAllRead() {
+  async function handleMarkAllRead() {
+    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
     try {
-      const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
-      if (unreadIds.length === 0) return;
-
       await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: unreadIds }),
       });
-
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, read: true }))
-      );
+      markAllAsRead();
     } catch {
       // silently fail
     }
   }
 
-  async function markAsRead(id: string) {
+  async function handleMarkAsRead(id: string) {
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [id] }),
       });
-
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
+      markAsRead(id);
     } catch {
       // silently fail
     }
@@ -93,7 +91,7 @@ export function NotificationsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={markAllRead}
+            onClick={handleMarkAllRead}
             className="text-gray-600 dark:text-gray-300"
           >
             <CheckCheck className="h-4 w-4" />
@@ -132,7 +130,7 @@ export function NotificationsPage() {
             <NotificationItem
               key={notification.id}
               notification={notification}
-              onRead={markAsRead}
+              onRead={handleMarkAsRead}
             />
           ))}
         </div>

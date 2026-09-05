@@ -4,6 +4,7 @@ import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 import { messageSchema } from "@/lib/validation";
 import { assertConversationMember } from "@/lib/conversation-utils";
+import { createNotification } from "@/lib/notification-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -190,14 +191,12 @@ export async function POST(request: NextRequest) {
 
     if (partnerMember) {
       const senderName = user.name || user.username || "Your partner";
-      await db.notification.create({
-        data: {
-          userId: partnerMember.userId,
-          type: "MESSAGE",
-          title: "New Message",
-          message: `${senderName} sent you a message`,
-          link: "/chat",
-        },
+      await createNotification({
+        userId: partnerMember.userId,
+        type: "MESSAGE",
+        title: "New Message",
+        message: `${senderName} sent you a message`,
+        link: "/chat",
       });
     }
 

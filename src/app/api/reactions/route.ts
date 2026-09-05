@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { assertMessageAccess } from "@/lib/conversation-utils";
+import { createNotification } from "@/lib/notification-helpers";
 
 const reactionSchema = z.object({
   messageId: z.string().uuid(),
@@ -42,6 +43,26 @@ export async function POST(request: NextRequest) {
     const reaction = await db.messageReaction.create({
       data: { messageId, userId: user.id, emoji },
     });
+
+    // Notify message sender (not self)
+    try {
+      const msg = await db.message.findUnique({
+        where: { id: messageId },
+        select: { senderId: true, sender: { select: { name: true, username: true } } },
+      });
+      if (msg && msg.senderId !== user.id) {
+        const reactorName = user.name || user.username || "Someone";
+        await createNotification({
+          userId: msg.senderId,
+          type: "REACTION",
+          title: "New Reaction",
+          message: `${reactorName} reacted ${emoji} to your message`,
+          link: "/chat",
+        });
+      }
+    } catch {
+      // notification failure is non-critical
+    }
 
     return successResponse(reaction, 201);
   } catch (error) {

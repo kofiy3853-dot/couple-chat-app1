@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse, getCurrentUser } from "@/lib/api-utils";
 import { ValidationError, ForbiddenError } from "@/lib/errors";
 import { memorySchema } from "@/lib/validation";
+import { createNotificationMany } from "@/lib/notification-helpers";
 
 async function getCoupleId(userId: string) {
   const member = await db.coupleMember.findFirst({
@@ -102,15 +103,13 @@ export async function POST(request: NextRequest) {
         .map((m: { userId: string }) => m.userId)
         .filter((id: string) => id !== user.id);
 
-      await db.notification.createMany({
-        data: partnerIds.map((partnerId: string) => ({
-          userId: partnerId,
-          type: "MEMORY",
-          title: "New Memory",
-          message: `${user.name ?? "Your partner"} added a new memory: ${memory.title}`,
-          link: `/memories/${memory.id}`,
-        })),
-      });
+      await createNotificationMany(
+        partnerIds,
+        "MEMORY",
+        "New Memory",
+        `${user.name ?? "Your partner"} added a new memory: ${memory.title}`,
+        `/memories/${memory.id}`,
+      );
     }
 
     return successResponse(memory, 201);

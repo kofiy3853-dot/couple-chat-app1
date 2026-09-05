@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const user = await requireAuth();
-    const body = await request.json();
-    const { ids } = body as { ids?: string[] };
+    const body = await request.json().catch(() => ({}));
+    const { ids } = (body ?? {}) as { ids?: string[] };
 
     if (ids && ids.length > 0) {
       await db.notification.updateMany({

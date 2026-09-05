@@ -15,7 +15,7 @@ interface Notification {
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
-  setNotifications: (notifications: Notification[]) => void;
+  setNotifications: (notifications: Notification[] | ((prev: Notification[]) => Notification[])) => void;
   addNotification: (notification: Notification) => void;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
@@ -26,14 +26,19 @@ interface NotificationState {
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
-  setNotifications: (notifications) =>
-    set({
-      notifications,
-      unreadCount: notifications.filter((n) => !n.read).length,
+  setNotifications: (notificationsOrFn) =>
+    set((state) => {
+      const notifications = typeof notificationsOrFn === "function"
+        ? notificationsOrFn(state.notifications)
+        : notificationsOrFn;
+      return {
+        notifications,
+        unreadCount: notifications.filter((n) => !n.read).length,
+      };
     }),
   addNotification: (notification) =>
     set((state) => ({
-      notifications: [notification, ...state.notifications],
+      notifications: [notification, ...state.notifications].slice(0, 20),
       unreadCount: state.unreadCount + (notification.read ? 0 : 1),
     })),
   markAsRead: (notificationId) =>

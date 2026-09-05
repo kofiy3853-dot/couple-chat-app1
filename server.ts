@@ -6,6 +6,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
 import { getToken } from "next-auth/jwt";
 import { db } from "@/lib/db";
+import { createNotification } from "@/lib/notification-helpers";
 import type { PresenceStatus } from "@/lib/constants";
 import { messageRateLimiter, typingRateLimiter, reactionRateLimiter, gameRateLimiter, connectionRateLimiter } from "./src/server/websocket/rate-limiter";
 
@@ -339,6 +340,45 @@ app.prepare().then(() => {
         await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
         io.to(`conversation:${conversationId}`).emit("new-message", message);
         socket.emit("message-sent", { localId, message });
+
+        // Create notification for partner
+        try {
+          const conv = await db.conversation.findUnique({
+            where: { id: conversationId },
+            include: { couple: { include: { members: true } } },
+          });
+          const partner = conv?.couple?.members.find((m) => m.userId !== userId);
+          if (partner) {
+            const sender = message.sender;
+            const senderName = sender?.name || sender?.username || "Your partner";
+            const notifCreated = await createNotification({
+              userId: partner.userId,
+              type: "MESSAGE",
+              title: "New Message",
+              message: `${senderName} sent you a message`,
+              link: "/chat",
+            });
+            if (notifCreated) {
+              const notif = await db.notification.findFirst({
+                where: { userId: partner.userId, type: "MESSAGE" },
+                orderBy: { createdAt: "desc" },
+              });
+              if (notif) {
+                io.to(`user:${partner.userId}`).emit("new-notification", {
+                  id: notif.id,
+                  type: notif.type,
+                  title: notif.title,
+                  message: notif.message,
+                  link: notif.link,
+                  read: false,
+                  createdAt: notif.createdAt.toISOString(),
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[WS] notification error:", e);
+        }
       } catch (err) {
         console.error("[WS] send-message error:", err);
         socket.emit("error", { message: "Failed to send message" });
