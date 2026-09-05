@@ -111,9 +111,11 @@ async function isConversationMember(userId: string, conversationId: string): Pro
 io.use(async (socket: AuthenticatedSocket, next) => {
   try {
     const cookieHeader = socket.handshake.headers?.cookie || "";
+    const isProduction = process.env.NODE_ENV === "production";
     const token = await getToken({
       req: { headers: { cookie: cookieHeader } } as unknown as Request,
       secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+      cookieName: isProduction ? "__Secure-next-auth.session-token" : "next-auth.session-token",
     });
 
 if (!token?.id) {

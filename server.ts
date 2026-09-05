@@ -94,9 +94,11 @@ app.prepare().then(() => {
     try {
       // Verify JWT session token from cookies
       const cookieHeader = socket.handshake.headers?.cookie || "";
+      const isProduction = process.env.NODE_ENV === "production";
       const token = await getToken({
         req: { headers: { cookie: cookieHeader } } as unknown as Request,
         secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+        cookieName: isProduction ? "__Secure-next-auth.session-token" : "next-auth.session-token",
       });
 
       if (!token?.id) {
