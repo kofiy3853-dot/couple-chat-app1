@@ -21,6 +21,7 @@ interface UseSocketOptions {
 
 export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
+  const [reconnectFailed, setReconnectFailed] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
   const [presenceState, setPresenceState] = useState<Record<string, PresenceStatus>>({});
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -52,6 +53,13 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
+  // Clear typing state when conversation changes
+  useEffect(() => {
+    Object.values(typingTimers.current).forEach(clearTimeout);
+    typingTimers.current = {};
+    setTypingState({});
+  }, [conversationId]);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -60,12 +68,17 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
 
     const unsubConnected = client.on("connected", () => {
       setConnected(true);
+      setReconnectFailed(false);
       if (conversationIdRef.current) {
         client.joinConversation(conversationIdRef.current);
       }
     });
 
     const unsubDisconnected = client.on("disconnected", () => setConnected(false));
+
+    const unsubReconnectFailed = client.on("reconnect-failed", () => {
+      setReconnectFailed(true);
+    });
 
     const unsubOnline = client.on("user-online", (data: { userId: string }) => {
       setPresenceState((prev) => ({ ...prev, [data.userId]: prev[data.userId] === "offline" ? "online" : (prev[data.userId] ?? "online") }));
@@ -160,6 +173,7 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     return () => {
       unsubConnected();
       unsubDisconnected();
+      unsubReconnectFailed();
       unsubOnline();
       unsubOffline();
       unsubPresenceSnapshot();
@@ -204,13 +218,6 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
-  const broadcastMessage = useCallback(
-    (message: { id: string; conversationId: string; senderId: string; content: string; type: string; deletedAt: unknown; createdAt: string; updatedAt: string; isEdited: boolean; replyToId: string | null; replyTo: unknown; sender: unknown; reactions: unknown[]; attachments: unknown[] }) => {
-      clientRef.current?.getSocket()?.emit("broadcast-new-message", { message });
-    },
-    []
-  );
-
   const broadcastMessageDeleted = useCallback(
     (messageId: string, conversationId: string) => {
       clientRef.current?.getSocket()?.emit("message-deleted", { messageId, conversationId });
@@ -247,34 +254,6 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
-  const addReaction = useCallback(
-    (messageId: string, conversationId: string, emoji: string) => {
-      clientRef.current?.addReaction(messageId, conversationId, emoji);
-    },
-    []
-  );
-
-  const removeReaction = useCallback(
-    (messageId: string, conversationId: string, emoji: string) => {
-      clientRef.current?.removeReaction(messageId, conversationId, emoji);
-    },
-    []
-  );
-
-  const deleteMessage = useCallback(
-    (messageId: string, conversationId: string) => {
-      clientRef.current?.deleteMessage(messageId, conversationId);
-    },
-    []
-  );
-
-  const markAsRead = useCallback(
-    (conversationId: string, lastReadMessageId: string) => {
-      clientRef.current?.markAsRead(conversationId, lastReadMessageId);
-    },
-    []
-  );
-
   const startRecording = useCallback(
     (conversationId: string) => {
       clientRef.current?.startRecording(conversationId);
@@ -303,9 +282,9 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
-  const editMessage = useCallback(
-    (messageId: string, conversationId: string, content: string) => {
-      clientRef.current?.editMessage(messageId, conversationId, content);
+  const markAsRead = useCallback(
+    (conversationId: string, lastReadMessageId: string) => {
+      clientRef.current?.markAsRead(conversationId, lastReadMessageId);
     },
     []
   );
@@ -348,10 +327,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
 
   return {
     connected,
+    reconnectFailed,
     typingState,
     presenceState,
     sendMessage,
-    broadcastMessage,
     broadcastMessageDeleted,
     broadcastMessageEdited,
     broadcastReactionToggled,
@@ -361,10 +340,6 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     stopRecording,
     startCall,
     endCall,
-    addReaction,
-    removeReaction,
-    deleteMessage,
-    editMessage,
     markAsRead,
     startGame,
     makeChoice,

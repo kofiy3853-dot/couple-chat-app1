@@ -33,6 +33,7 @@ export function MessageList({
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(messages.length);
   const isAtBottomRef = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
@@ -42,8 +43,13 @@ export function MessageList({
     });
   }, []);
 
+  // Auto-scroll on new messages (not on prepend)
   useEffect(() => {
-    if (isAtBottomRef.current) {
+    const newCount = messages.length;
+    const oldCount = prevMessageCountRef.current;
+    prevMessageCountRef.current = newCount;
+
+    if (newCount > oldCount && isAtBottomRef.current) {
       scrollToBottom(false);
     }
   }, [messages, scrollToBottom]);
@@ -65,10 +71,10 @@ export function MessageList({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !hasMore) return;
+    if (!container || !hasMore || loadingMore) return;
 
     const handleScroll = () => {
-      if (container.scrollTop < 50 && !loadingMore) {
+      if (container.scrollTop < 50) {
         onLoadMore();
       }
     };
@@ -93,7 +99,7 @@ export function MessageList({
   }
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4">
+    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4 relative">
       {hasMore && (
         <div className="flex justify-center py-2">
           {loadingMore ? (
@@ -140,7 +146,7 @@ export function MessageList({
       {showScrollDown && (
         <button
           onClick={() => scrollToBottom(true)}
-          className="fixed bottom-24 right-6 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <ArrowDown className="h-4 w-4 text-gray-600 dark:text-gray-300" />
         </button>

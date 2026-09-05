@@ -28,10 +28,12 @@ class WebSocketClient {
   }
 
   static getInstance(options: WebSocketClientOptions = {}): WebSocketClient {
-    // Return existing instance if available (don't destroy on userId change)
-    // The React hook manages lifecycle per userId
     if (!WebSocketClient.instance) {
       WebSocketClient.instance = new WebSocketClient(options);
+    } else if (options.userId && options.userId !== WebSocketClient.instance.userId) {
+      // User changed (e.g., re-login) — reset connection
+      WebSocketClient.instance.disconnect();
+      WebSocketClient.instance.userId = options.userId;
     }
     return WebSocketClient.instance;
   }

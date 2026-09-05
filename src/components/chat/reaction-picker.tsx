@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const EMOJIS = ["❤️", "😍", "🥰", "😂", "😭", "👍", "🔥", "💋", "🫶", "✨"];
 
@@ -11,6 +11,16 @@ interface ReactionPickerProps {
 
 export function ReactionPicker({ onSelect, onClose }: ReactionPickerProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<"bottom" | "top">("bottom");
+
+  useEffect(() => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      if (rect.top < 60) {
+        setPosition("top");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -25,7 +35,9 @@ export function ReactionPicker({ onSelect, onClose }: ReactionPickerProps) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 z-50 flex gap-1 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700"
+      className={`absolute z-50 flex gap-1 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 ${
+        position === "bottom" ? "bottom-full mb-2" : "top-full mt-2"
+      } left-0`}
     >
       {EMOJIS.map((emoji) => (
         <button

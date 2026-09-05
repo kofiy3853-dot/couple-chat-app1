@@ -25,22 +25,18 @@ export function ChatPageClient({
 }: ChatPageClientProps) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [wsSending, setWsSending] = useState(false);
 
   const {
     messages,
     loading,
     loadingMore,
     hasMore,
-    sending,
     loadMore,
     deleteMessage,
     editMessage,
     addReaction,
     addRealtimeMessage,
-    markMessageDeleted,
-    markMessageEdited,
-    applyReactionAdded,
-    applyReactionRemoved,
   } = useChat({
     conversationId,
     userId,
@@ -55,7 +51,9 @@ export function ChatPageClient({
 
   const {
     connected,
+    reconnectFailed,
     typingState,
+    presenceState,
     sendMessage: wsSendMessage,
     startTyping,
     stopTyping,
@@ -70,13 +68,19 @@ export function ChatPageClient({
 
   const handleSend = async (content: string) => {
     if (!conversationId) return;
-    wsSendMessage(conversationId, content, "TEXT", replyTo?.id);
-    setReplyTo(null);
+    setWsSending(true);
+    try {
+      wsSendMessage(conversationId, content, "TEXT", replyTo?.id);
+      setReplyTo(null);
+    } finally {
+      setWsSending(false);
+    }
   };
 
   const handleAttachment = async (file: File) => {
     if (!conversationId) return;
     setUploadError(null);
+    setWsSending(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -92,6 +96,8 @@ export function ChatPageClient({
     } catch {
       setUploadError("Upload failed. Check your connection.");
       setTimeout(() => setUploadError(null), 3000);
+    } finally {
+      setWsSending(false);
     }
   };
 
@@ -126,6 +132,7 @@ export function ChatPageClient({
   }
 
   const isPartnerTyping = partnerUserId ? (typingState[partnerUserId] ?? false) : false;
+  const partnerPresence = partnerUserId ? (presenceState[partnerUserId] ?? "offline") : "offline";
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-950">
@@ -133,7 +140,9 @@ export function ChatPageClient({
         partnerName={partnerName}
         partnerImage={partnerImage}
         connected={connected}
+        reconnectFailed={reconnectFailed}
         isPartnerTyping={isPartnerTyping}
+        partnerPresence={partnerPresence}
       />
 
       <MessageList
@@ -162,7 +171,7 @@ export function ChatPageClient({
         onTypingStop={() => conversationId && stopTyping(conversationId)}
         replyTo={replyTo ? { id: replyTo.id, content: replyTo.content, senderName: replyTo.sender.name || "Someone" } : null}
         onCancelReply={() => setReplyTo(null)}
-        sending={sending}
+        sending={wsSending}
       />
     </div>
   );

@@ -230,7 +230,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   const userName = socket.userName!;
 
   // Connection rate limit
-  const connLimit = connectionRateLimiter(`conn:${userId}`);
+  const connLimit = await connectionRateLimiter(`conn:${userId}`);
   if (!connLimit.allowed) {
     console.warn(`[WS] Connection rate limit exceeded for user ${userId}`);
     socket.disconnect();
@@ -288,7 +288,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     if (!conversationId || !content) return;
 
     // Rate limit: 10 messages/second per user
-    const msgLimit = messageRateLimiter(`msg:${userId}`);
+    const msgLimit = await messageRateLimiter(`msg:${userId}`);
     if (!msgLimit.allowed) {
       socket.emit("error", { message: "Rate limit exceeded" });
       return;
@@ -402,7 +402,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     if (!data.conversationId) return;
     
     // Rate limit: 5 typing events/second per user
-    const typeLimit = typingRateLimiter(`type:${userId}`);
+    const typeLimit = await typingRateLimiter(`type:${userId}`);
     if (!typeLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, data.conversationId);
@@ -413,7 +413,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   socket.on("typing-stop", async (data: { conversationId: string }) => {
     if (!data.conversationId) return;
     
-    const typeLimit = typingRateLimiter(`type:${userId}`);
+    const typeLimit = await typingRateLimiter(`type:${userId}`);
     if (!typeLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, data.conversationId);
@@ -461,7 +461,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     if (!messageId || !conversationId || !emoji) return;
 
     // Rate limit: 20 reactions/second per user
-    const reactLimit = reactionRateLimiter(`react:${userId}`);
+    const reactLimit = await reactionRateLimiter(`react:${userId}`);
     if (!reactLimit.allowed) return;
 
     // Validate emoji (single codepoint, reasonable length)
@@ -476,7 +476,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { messageId, conversationId, emoji } = data;
     if (!messageId || !conversationId || !emoji) return;
 
-    const reactLimit = reactionRateLimiter(`react:${userId}`);
+    const reactLimit = await reactionRateLimiter(`react:${userId}`);
     if (!reactLimit.allowed) return;
 
     if (emoji.length > 8 || [...emoji].length !== 1) return;
@@ -513,7 +513,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, type } = data;
     if (!conversationId || !type) return;
 
-    const gameLimit = gameRateLimiter(`game:${userId}`);
+    const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
@@ -525,7 +525,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, type } = data;
     if (!conversationId || !type) return;
 
-    const gameLimit = gameRateLimiter(`game:${userId}`);
+    const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
@@ -537,7 +537,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, question, type } = data;
     if (!conversationId || !question) return;
 
-    const gameLimit = gameRateLimiter(`game:${userId}`);
+    const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
@@ -549,7 +549,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId, completed } = data;
     if (!conversationId) return;
 
-    const gameLimit = gameRateLimiter(`game:${userId}`);
+    const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
@@ -561,7 +561,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     const { conversationId } = data;
     if (!conversationId) return;
 
-    const gameLimit = gameRateLimiter(`game:${userId}`);
+    const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);

@@ -48,7 +48,6 @@ app.prepare().then(() => {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
-    allowEIO3: true,
   });
 
   // Suppress benign Socket.IO parse errors from transport upgrades/extensions
@@ -236,7 +235,7 @@ app.prepare().then(() => {
     const userName = userData.userName;
 
     // Connection rate limit
-    const connLimit = connectionRateLimiter(`conn:${userId}`);
+    const connLimit = await connectionRateLimiter(`conn:${userId}`);
     if (!connLimit.allowed) {
       console.warn(`[WS] Connection rate limit exceeded for user ${userId}`);
       socket.disconnect();
@@ -287,7 +286,7 @@ app.prepare().then(() => {
       if (!conversationId || !content) return;
 
       // Rate limit: 10 messages/second per user
-      const msgLimit = messageRateLimiter(`msg:${userId}`);
+      const msgLimit = await messageRateLimiter(`msg:${userId}`);
       if (!msgLimit.allowed) {
         socket.emit("error", { message: "Rate limit exceeded" });
         return;
@@ -404,7 +403,7 @@ app.prepare().then(() => {
     socket.on("typing-start", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
 
-      const typeLimit = typingRateLimiter(`type:${userId}`);
+      const typeLimit = await typingRateLimiter(`type:${userId}`);
       if (!typeLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, data.conversationId);
@@ -415,7 +414,7 @@ app.prepare().then(() => {
     socket.on("typing-stop", async (data: { conversationId: string }) => {
       if (!data.conversationId) return;
 
-      const typeLimit = typingRateLimiter(`type:${userId}`);
+      const typeLimit = await typingRateLimiter(`type:${userId}`);
       if (!typeLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, data.conversationId);
@@ -462,7 +461,7 @@ app.prepare().then(() => {
       const { messageId, conversationId, emoji } = data;
       if (!messageId || !conversationId || !emoji) return;
 
-      const reactLimit = reactionRateLimiter(`react:${userId}`);
+      const reactLimit = await reactionRateLimiter(`react:${userId}`);
       if (!reactLimit.allowed) return;
 
       if (emoji.length > 8 || [...emoji].length !== 1) return;
@@ -476,7 +475,7 @@ app.prepare().then(() => {
       const { messageId, conversationId, emoji } = data;
       if (!messageId || !conversationId || !emoji) return;
 
-      const reactLimit = reactionRateLimiter(`react:${userId}`);
+      const reactLimit = await reactionRateLimiter(`react:${userId}`);
       if (!reactLimit.allowed) return;
 
       if (emoji.length > 8 || [...emoji].length !== 1) return;
@@ -515,7 +514,7 @@ app.prepare().then(() => {
       const { conversationId, type } = data;
       if (!conversationId || !type) return;
 
-      const gameLimit = gameRateLimiter(`game:${userId}`);
+      const gameLimit = await gameRateLimiter(`game:${userId}`);
       if (!gameLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, conversationId);
@@ -527,7 +526,7 @@ app.prepare().then(() => {
       const { conversationId, type } = data;
       if (!conversationId || !type) return;
 
-      const gameLimit = gameRateLimiter(`game:${userId}`);
+      const gameLimit = await gameRateLimiter(`game:${userId}`);
       if (!gameLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, conversationId);
@@ -539,7 +538,7 @@ app.prepare().then(() => {
       const { conversationId, question, type } = data;
       if (!conversationId || !question) return;
 
-      const gameLimit = gameRateLimiter(`game:${userId}`);
+      const gameLimit = await gameRateLimiter(`game:${userId}`);
       if (!gameLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, conversationId);
@@ -551,7 +550,7 @@ app.prepare().then(() => {
       const { conversationId, completed } = data;
       if (!conversationId) return;
 
-      const gameLimit = gameRateLimiter(`game:${userId}`);
+      const gameLimit = await gameRateLimiter(`game:${userId}`);
       if (!gameLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, conversationId);
@@ -563,7 +562,7 @@ app.prepare().then(() => {
       const { conversationId } = data;
       if (!conversationId) return;
 
-      const gameLimit = gameRateLimiter(`game:${userId}`);
+      const gameLimit = await gameRateLimiter(`game:${userId}`);
       if (!gameLimit.allowed) return;
 
       const { isMember } = await isConversationMember(userId, conversationId);

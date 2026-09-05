@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { MoreHorizontal, SmilePlus, Pencil, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
@@ -18,6 +18,8 @@ interface MessageItemProps {
   onDelete: (messageId: string) => void;
 }
 
+const MAX_EDIT_LENGTH = 5000;
+
 export function MessageItem({
   message,
   isOwn,
@@ -32,22 +34,35 @@ export function MessageItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isDeleted = !!message.deletedAt;
 
-  const groupedReactions = message.reactions.reduce(
-    (acc, r) => {
-      if (!acc[r.emoji]) acc[r.emoji] = { emoji: r.emoji, count: 0, users: [] };
-      acc[r.emoji].count++;
-      acc[r.emoji].users.push(r.user.name || "Someone");
-      return acc;
-    },
-    {} as Record<string, { emoji: string; count: number; users: string[] }>
-  );
+  const groupedReactions = useMemo(() => {
+    return message.reactions.reduce(
+      (acc, r) => {
+        if (!acc[r.emoji]) acc[r.emoji] = { emoji: r.emoji, count: 0, users: [] };
+        acc[r.emoji].count++;
+        acc[r.emoji].users.push(r.user.name || "Someone");
+        return acc;
+      },
+      {} as Record<string, { emoji: string; count: number; users: string[] }>
+    );
+  }, [message.reactions]);
+
+  // Auto-resize edit textarea
+  useEffect(() => {
+    if (isEditing && editTextareaRef.current) {
+      const el = editTextareaRef.current;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    }
+  }, [isEditing, editContent]);
 
   const handleEditSubmit = () => {
-    if (editContent.trim() && editContent !== message.content) {
-      onEdit(message.id, editContent.trim());
+    const trimmed = editContent.trim();
+    if (trimmed && trimmed !== message.content && trimmed.length <= MAX_EDIT_LENGTH) {
+      onEdit(message.id, trimmed);
     }
     setIsEditing(false);
   };
@@ -65,7 +80,7 @@ export function MessageItem({
   return (
     <div
       className={cn("flex px-4 py-1 group", isOwn ? "justify-end" : "justify-start")}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseLeave={() => { setShowActions(false); setConfirmDelete(false); }}
     >
       <div className={cn("flex gap-2 max-w-[75%]", isOwn && "flex-row-reverse")}>
         {!isOwn && showSender && (
@@ -103,10 +118,10 @@ export function MessageItem({
             {isEditing ? (
               <div className="flex flex-col gap-1">
                 <textarea
+                  ref={editTextareaRef}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="bg-transparent border-none outline-none resize-none text-sm min-w-[200px]"
-                  rows={2}
+                  className="bg-transparent border-none outline-none resize-none text-sm min-w-[200px] max-h-[120px]"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -116,7 +131,10 @@ export function MessageItem({
                     if (e.key === "Escape") setIsEditing(false);
                   }}
                 />
-                <div className="flex gap-2 justify-end">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className={cn("text-[10px]", editContent.length > MAX_EDIT_LENGTH ? "text-red-400" : "opacity-50")}>
+                    {editContent.length}/{MAX_EDIT_LENGTH}
+                  </span>
                   <button
                     onClick={() => setIsEditing(false)}
                     className="text-xs opacity-70 hover:opacity-100"
@@ -125,7 +143,8 @@ export function MessageItem({
                   </button>
                   <button
                     onClick={handleEditSubmit}
-                    className="text-xs font-medium underline"
+                    disabled={!editContent.trim() || editContent === message.content || editContent.length > MAX_EDIT_LENGTH}
+                    className="text-xs font-medium underline disabled:opacity-40"
                   >
                     Save
                   </button>
@@ -215,7 +234,7 @@ export function MessageItem({
                 />
               )}
 
-                  {isOwn && (
+              {isOwn && (
                 <>
                   <button
                     onClick={() => {

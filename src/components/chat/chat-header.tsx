@@ -1,23 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 import { TypingIndicator } from "./typing-indicator";
+import type { PresenceStatus } from "@/lib/constants";
 
 interface ChatHeaderProps {
   partnerName: string | null;
   partnerImage: string | null;
   connected: boolean;
+  reconnectFailed: boolean;
   isPartnerTyping: boolean;
+  partnerPresence: PresenceStatus;
+}
+
+function getPresenceText(presence: PresenceStatus): string {
+  switch (presence) {
+    case "online": return "Online";
+    case "recording": return "Recording...";
+    case "in-call": return "In a call";
+    case "offline": return "Offline";
+    default: return "Offline";
+  }
 }
 
 export function ChatHeader({
   partnerName,
   partnerImage,
   connected,
+  reconnectFailed,
   isPartnerTyping,
+  partnerPresence,
 }: ChatHeaderProps) {
   return (
     <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
@@ -43,14 +58,29 @@ export function ChatHeader({
           <TypingIndicator />
         ) : (
           <div className="flex items-center gap-1.5">
-            {connected ? (
-              <Wifi className="h-3 w-3 text-green-500" />
+            {reconnectFailed ? (
+              <>
+                <RefreshCw className="h-3 w-3 text-red-400" />
+                <span className="text-xs text-red-500">Disconnected</span>
+              </>
+            ) : connected ? (
+              <>
+                <div className={`h-2 w-2 rounded-full ${
+                  partnerPresence === "online" ? "bg-green-500" :
+                  partnerPresence === "recording" ? "bg-yellow-500 animate-pulse" :
+                  partnerPresence === "in-call" ? "bg-blue-500" :
+                  "bg-gray-400"
+                }`} />
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {getPresenceText(partnerPresence)}
+                </span>
+              </>
             ) : (
-              <WifiOff className="h-3 w-3 text-gray-400" />
+              <>
+                <WifiOff className="h-3 w-3 text-gray-400" />
+                <span className="text-xs text-gray-500">Connecting...</span>
+              </>
             )}
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {connected ? "Online" : "Connecting..."}
-            </span>
           </div>
         )}
       </div>

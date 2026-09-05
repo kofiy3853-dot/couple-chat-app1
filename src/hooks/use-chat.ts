@@ -218,12 +218,12 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
   }, [conversationId, fetchMessages]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !cursor) return;
+    if (loading || loadingMore || !hasMore || !cursor) return;
 
     setLoadingMore(true);
     await fetchMessages(cursor, true);
     setLoadingMore(false);
-  }, [loadingMore, hasMore, cursor, fetchMessages]);
+  }, [loading, loadingMore, hasMore, cursor, fetchMessages]);
 
   const sendMessage = useCallback(
     async (content: string, type: "TEXT" | "IMAGE" = "TEXT", replyToId?: string) => {
