@@ -3,7 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 const isProduction = process.env.NODE_ENV === "production";
 
 export const authConfig = {
-  trustHost: !isProduction,
+  trustHost: true,
   session: { strategy: "jwt" as const, maxAge: 30 * 24 * 60 * 60 },
   pages: {
     signIn: "/login",
