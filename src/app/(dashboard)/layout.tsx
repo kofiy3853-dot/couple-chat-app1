@@ -33,7 +33,7 @@ export default async function DashboardLayout({
 
   return (
     <NotificationListener>
-      <div className="h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
+      <div className="h-dvh lg:h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
         <Sidebar
           hasCouple={hasCouple}
           user={currentUser}
