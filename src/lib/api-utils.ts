@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UnauthorizedError, ForbiddenError, AppError, ValidationError } from "./errors";
 import { auth } from "./auth";
 import { ROLES } from "./constants";
+import { rateLimit, RATE_LIMITS, type RateLimitKey } from "./rate-limit";
 
 export interface AuthUser {
   id: string;
@@ -90,4 +91,44 @@ export async function requireAdmin(): Promise<AuthUser> {
     throw new ForbiddenError("Admin access required");
   }
   return user;
+}
+
+export async function checkRateLimit(
+  identifier: string,
+  limitKey: RateLimitKey
+): Promise<NextResponse | null> {
+  const config = RATE_LIMITS[limitKey];
+  const result = await rateLimit(identifier, config);
+
+  if (!result.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: "Too many requests",
+          code: "RATE_LIMITED",
+          retryAfter: result.resetAt - Math.floor(Date.now() / 1000),
+        },
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(result.resetAt - Math.floor(Date.now() / 1000)),
+          "X-RateLimit-Limit": String(config.maxRequests),
+          "X-RateLimit-Remaining": String(result.remaining),
+          "X-RateLimit-Reset": String(result.resetAt),
+        },
+      }
+    );
+  }
+
+  return null;
+}
+
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return "unknown";
 }

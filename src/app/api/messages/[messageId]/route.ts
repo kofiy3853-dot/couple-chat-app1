@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
 import { NotFoundError, ForbiddenError, ValidationError } from "@/lib/errors";
 import { assertMessageAccess } from "@/lib/conversation-utils";
+import { sanitizeMessageContent } from "@/lib/sanitize";
 
 export async function DELETE(
   _request: NextRequest,
@@ -79,7 +80,7 @@ export async function PATCH(
 
     const updatedMessage = await db.message.update({
       where: { id: messageId },
-      data: { content: content.trim(), isEdited: true },
+      data: { content: sanitizeMessageContent(content.trim(), "TEXT"), isEdited: true },
     });
 
     return successResponse(updatedMessage);

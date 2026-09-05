@@ -141,7 +141,7 @@ export function LoveMessageWidget({ userName, partnerName }: LoveMessageWidgetPr
               className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed italic transition-opacity duration-[400ms]"
               style={{ opacity: fadeIn ? 1 : 0 }}
             >
-              "{loveMessage}"
+              &quot;{loveMessage}&quot;
             </p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 flex items-center gap-1">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-300 dark:bg-rose-600 animate-pulse" />

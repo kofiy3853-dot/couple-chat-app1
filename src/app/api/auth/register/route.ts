@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
-import { successResponse, errorResponse } from "@/lib/api-utils";
+import { successResponse, errorResponse, checkRateLimit, getClientIp } from "@/lib/api-utils";
 import { ValidationError } from "@/lib/errors";
 import { BCRYPT_SALT_ROUNDS } from "@/lib/constants";
 import { z } from "zod";
@@ -18,6 +18,10 @@ const registerSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateLimitResponse = await checkRateLimit(`register:${ip}`, "auth");
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await request.json();
     const parsed = registerSchema.safeParse(body);
 

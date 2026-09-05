@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { requireAuth, successResponse, errorResponse, checkRateLimit, getClientIp } from "@/lib/api-utils";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/lib/errors";
 import { messageSchema } from "@/lib/validation";
 import { assertConversationMember } from "@/lib/conversation-utils";
 import { createNotification } from "@/lib/notification-helpers";
+import { sanitizeMessageContent } from "@/lib/sanitize";
 
 export async function GET(request: NextRequest) {
   try {
@@ -102,6 +103,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
+    const ip = getClientIp(request);
+    const rateLimitResponse = await checkRateLimit(`msg:${user.id}:${ip}`, "messages");
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await request.json();
 
     const parsed = messageSchema.safeParse(body);
@@ -118,12 +123,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { conversationId, content, type } = body as {
-      conversationId: string;
-      content: string;
-      type?: string;
-    };
-    const replyToId = parsed.data.replyToId;
+    const { conversationId, type, replyToId } = parsed.data;
 
     if (!conversationId) {
       return errorResponse(
@@ -150,15 +150,15 @@ export async function POST(request: NextRequest) {
 
     await assertConversationMember(conversationId, user.id);
 
-    const messageTypeValid = (type: unknown): type is "TEXT" | "IMAGE" | "AUDIO" =>
-      type === "TEXT" || type === "IMAGE" || type === "AUDIO";
+    const messageTypeValid = (t: unknown): t is "TEXT" | "IMAGE" | "AUDIO" =>
+      t === "TEXT" || t === "IMAGE" || t === "AUDIO";
     const finalType: "TEXT" | "IMAGE" | "AUDIO" = messageTypeValid(type) ? type : "TEXT";
 
     const message = await db.message.create({
       data: {
         conversationId,
         senderId: user.id,
-        content: parsed.data.content,
+        content: sanitizeMessageContent(parsed.data.content, finalType),
         type: finalType,
         replyToId,
       },

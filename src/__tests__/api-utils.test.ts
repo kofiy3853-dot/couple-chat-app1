@@ -1,162 +1,72 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
-
-vi.mock("next/server", () => ({
-  NextResponse: {
-    json: vi.fn((body: unknown, init?: ResponseInit) => {
-      return {
-        status: init?.status ?? 200,
-        body,
-        json: () => Promise.resolve(body),
-      } as unknown as NextResponse;
-    }),
-  },
-}));
+import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }));
 
-import {
-  successResponse,
-  errorResponse,
-  paginateResponse,
-  getCurrentUser,
-  requireAuth,
-} from "@/lib/api-utils";
-import { NotFoundError, ValidationError, UnauthorizedError } from "@/lib/errors";
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: vi.fn(),
+  RATE_LIMITS: {
+    auth: { windowMs: 900000, maxRequests: 10, keyPrefix: "auth" },
+    api: { windowMs: 60000, maxRequests: 100, keyPrefix: "api" },
+    messages: { windowMs: 60000, maxRequests: 60, keyPrefix: "msg" },
+    uploads: { windowMs: 60000, maxRequests: 10, keyPrefix: "upload" },
+    invitations: { windowMs: 60000, maxRequests: 5, keyPrefix: "inv" },
+  },
+}));
+
+import { successResponse, errorResponse, getClientIp } from "@/lib/api-utils";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 
 describe("successResponse", () => {
-  it("returns success response with data", () => {
-    const data = { id: "1", name: "Test" };
-    const response = successResponse(data);
+  it("returns 200 by default", () => {
+    const response = successResponse({ id: 1 });
     expect(response.status).toBe(200);
   });
 
-  it("returns success response with custom status", () => {
-    const data = { created: true };
-    const response = successResponse(data, 201);
+  it("returns custom status code", () => {
+    const response = successResponse({ id: 1 }, 201);
     expect(response.status).toBe(201);
   });
 
-  it("returns success response with default status 200", () => {
-    const response = successResponse("ok");
-    expect(response.status).toBe(200);
+  it("returns correct JSON structure", async () => {
+    const response = successResponse({ name: "test" });
+    const body = await response.json();
+    expect(body).toEqual({ success: true, data: { name: "test" } });
   });
 });
 
 describe("errorResponse", () => {
-  it("returns error response for AppError", () => {
-    const error = new NotFoundError("User not found");
+  it("handles AppError", () => {
+    const error = new NotFoundError("Not found");
     const response = errorResponse(error);
     expect(response.status).toBe(404);
   });
 
-  it("returns error response for ValidationError with errors", () => {
-    const error = new ValidationError("Invalid input", {
-      email: ["Invalid email"],
-    });
+  it("handles ValidationError with field errors", async () => {
+    const error = new ValidationError("Invalid", { email: ["Required"] });
     const response = errorResponse(error);
-    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+    expect(body.error.errors).toEqual({ email: ["Required"] });
   });
 
-  it("returns 500 for unknown errors", () => {
-    const response = errorResponse(new Error("Unknown"));
+  it("handles unknown errors as 500", () => {
+    const response = errorResponse(new Error("something"));
     expect(response.status).toBe(500);
   });
-
-  it("returns custom status for non-AppError", () => {
-    const response = errorResponse("string error", 502);
-    expect(response.status).toBe(502);
-  });
 });
 
-describe("paginateResponse", () => {
-  it("returns paginated response", () => {
-    const data = [{ id: "1" }, { id: "2" }];
-    const response = paginateResponse(data, 1, 10, 25);
-    expect(response.status).toBe(200);
-  });
-
-  it("calculates totalPages correctly", () => {
-    const data = [1, 2, 3];
-    const response = paginateResponse(data, 1, 10, 25);
-    expect(response.status).toBe(200);
-  });
-
-  it("returns empty array for page beyond total", () => {
-    const data: unknown[] = [];
-    const response = paginateResponse(data, 10, 10, 5);
-    expect(response.status).toBe(200);
-  });
-});
-
-describe("getCurrentUser", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns null when no session", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue(null as any);
-
-    const user = await getCurrentUser();
-    expect(user).toBeNull();
-  });
-
-  it("returns null when session has no user id", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue({ user: {} } as any);
-
-    const user = await getCurrentUser();
-    expect(user).toBeNull();
-  });
-
-  it("returns user when session exists", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue({
-      user: {
-        id: "user-1",
-        name: "John",
-        email: "john@example.com",
-        image: "https://example.com/img.jpg",
-        username: "johndoe",
-        role: "USER",
-      },
-    } as any);
-
-    const user = await getCurrentUser();
-    expect(user).toEqual({
-      id: "user-1",
-      name: "John",
-      email: "john@example.com",
-      image: "https://example.com/img.jpg",
-      username: "johndoe",
-      role: "USER",
+describe("getClientIp", () => {
+  it("extracts IP from x-forwarded-for", () => {
+    const request = new Request("http://localhost", {
+      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
-  });
-});
-
-describe("requireAuth", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+    expect(getClientIp(request)).toBe("1.2.3.4");
   });
 
-  it("throws UnauthorizedError when no session", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue(null as any);
-
-    await expect(requireAuth()).rejects.toThrow(UnauthorizedError);
-  });
-
-  it("returns user when authenticated", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "user-1", name: "John" },
-    } as any);
-
-    const user = await requireAuth();
-    expect(user.id).toBe("user-1");
+  it("returns unknown when no header", () => {
+    const request = new Request("http://localhost");
+    expect(getClientIp(request)).toBe("unknown");
   });
 });

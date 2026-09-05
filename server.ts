@@ -20,13 +20,26 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        res.statusCode = 504;
+        res.end("Gateway Timeout");
+      }
+    }, 30000);
+
+    res.on("finish", () => clearTimeout(timeout));
+    res.on("close", () => clearTimeout(timeout));
+
     try {
       const parsedUrl = parse(req.url!, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error("Error handling request:", err);
-      res.statusCode = 500;
-      res.end("Internal Server Error");
+      clearTimeout(timeout);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.end("Internal Server Error");
+      }
     }
   });
 

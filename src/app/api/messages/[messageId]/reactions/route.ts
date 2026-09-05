@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { requireAuth, successResponse, errorResponse, checkRateLimit, getClientIp } from "@/lib/api-utils";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { assertMessageAccess } from "@/lib/conversation-utils";
 
@@ -16,6 +16,10 @@ export async function POST(
 ) {
   try {
     const user = await requireAuth();
+    const ip = getClientIp(request);
+    const rateLimitResponse = await checkRateLimit(`react:${user.id}:${ip}`, "api");
+    if (rateLimitResponse) return rateLimitResponse;
+
     const { messageId } = await params;
     const body = await request.json();
 
