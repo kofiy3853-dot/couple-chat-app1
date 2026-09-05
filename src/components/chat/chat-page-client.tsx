@@ -37,6 +37,8 @@ export function ChatPageClient({
     editMessage,
     addReaction,
     addRealtimeMessage,
+    applyReactionAdded,
+    applyReactionRemoved,
   } = useChat({
     conversationId,
     userId,
@@ -47,6 +49,24 @@ export function ChatPageClient({
       addRealtimeMessage(message as Message);
     },
     [addRealtimeMessage]
+  );
+
+  const handleReactionAdded = useCallback(
+    (data: unknown) => {
+      const d = data as { messageId: string; userId: string; emoji: string; userName?: string };
+      if (d.userId === userId) return;
+      applyReactionAdded(d);
+    },
+    [userId, applyReactionAdded]
+  );
+
+  const handleReactionRemoved = useCallback(
+    (data: unknown) => {
+      const d = data as { messageId: string; userId: string; emoji: string };
+      if (d.userId === userId) return;
+      applyReactionRemoved(d);
+    },
+    [userId, applyReactionRemoved]
   );
 
   const {
@@ -64,6 +84,8 @@ export function ChatPageClient({
     conversationId,
     userId,
     onNewMessage: handleNewMessage,
+    onReactionAdded: handleReactionAdded,
+    onReactionRemoved: handleReactionRemoved,
   });
 
   const handleSend = async (content: string) => {
