@@ -207,7 +207,7 @@ export function MessageInput({
                 placeholder="Type a message..."
                 rows={1}
                 className={cn(
-                  "w-full resize-none rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500",
+                  "w-full resize-none rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent dark:bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500",
                   "focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500",
                   "max-h-20 overflow-y-auto"
                 )}
