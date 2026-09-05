@@ -1,45 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, User, Pencil } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Trash2, User, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Memory } from "./memories-page";
 
-interface MemoryDetailProps {
-  memory: Memory;
-  currentUserId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onDeleted: (id: string) => void;
-  onUpdated: (memory: Memory) => void;
+interface Memory {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  date: string;
+  createdAt: string;
+  creator: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
 }
 
-export function MemoryDetail({
-  memory,
-  currentUserId,
-  open,
-  onOpenChange,
-  onDeleted,
-  onUpdated,
-}: MemoryDetailProps) {
+interface MemoryDetailViewProps {
+  memory: Memory;
+  currentUserId: string;
+}
+
+export function MemoryDetailView({ memory, currentUserId }: MemoryDetailViewProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(memory.title);
   const [editDescription, setEditDescription] = useState(memory.description ?? "");
   const [editDate, setEditDate] = useState(memory.date?.split("T")[0] ?? "");
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
 
   const isCreator = memory.creator.id === currentUserId;
 
@@ -53,12 +49,10 @@ export function MemoryDetail({
   async function handleDelete() {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/memories/${memory.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/memories/${memory.id}`, { method: "DELETE" });
       if (res.ok) {
-        onDeleted(memory.id);
         toast({ title: "Memory deleted" });
+        router.push("/memories");
       } else {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error?.message || "Failed to delete");
@@ -93,10 +87,9 @@ export function MemoryDetail({
         throw new Error(err?.error?.message || "Failed to update");
       }
 
-      const data = await res.json();
-      onUpdated(data.data);
       setEditing(false);
       toast({ title: "Memory updated" });
+      router.refresh();
     } catch (err) {
       toast({
         title: "Error",
@@ -108,28 +101,31 @@ export function MemoryDetail({
     }
   }
 
-  function startEdit() {
-    setEditTitle(memory.title);
-    setEditDescription(memory.description ?? "");
-    setEditDate(memory.date?.split("T")[0] ?? "");
-    setEditing(true);
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        {memory.imageUrl && !editing && (
-          <div className="relative -m-6 mb-0 overflow-hidden rounded-t-lg">
-            <img
-              src={memory.imageUrl}
-              alt={memory.title}
-              className="w-full h-64 sm:h-80 object-cover"
-            />
-          </div>
-        )}
+    <div className="max-w-3xl mx-auto space-y-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => router.push("/memories")}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Memories
+      </Button>
 
+      {memory.imageUrl && !editing && (
+        <div className="rounded-xl overflow-hidden">
+          <img
+            src={memory.imageUrl}
+            alt={memory.title}
+            className="w-full h-64 sm:h-96 object-cover"
+          />
+        </div>
+      )}
+
+      <div className="rounded-xl border bg-card shadow p-6 space-y-4">
         {editing ? (
-          <div className="space-y-4 pt-4">
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Title <span className="text-rose-500">*</span>
@@ -148,7 +144,7 @@ export function MemoryDetail({
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
                 placeholder="Tell the story..."
-                rows={3}
+                rows={4}
               />
             </div>
             <div>
@@ -164,10 +160,10 @@ export function MemoryDetail({
           </div>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle className="text-xl">{memory.title}</DialogTitle>
-              <DialogDescription>{formattedDate}</DialogDescription>
-            </DialogHeader>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {memory.title}
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">{formattedDate}</p>
 
             {memory.description && (
               <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
@@ -182,52 +178,37 @@ export function MemoryDetail({
           </>
         )}
 
-        <DialogFooter className="flex-row gap-2 sm:gap-2">
-          {editing ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditing(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={saving || !editTitle.trim()}
-                className="bg-rose-500 hover:bg-rose-600 text-white"
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
-            </>
-          ) : (
-            <>
-              {isCreator && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={startEdit}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={deleting}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {deleting ? "Deleting..." : "Delete"}
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {isCreator && (
+          <div className="flex gap-2 pt-4 border-t">
+            {editing ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving || !editTitle.trim()}
+                  className="bg-rose-500 hover:bg-rose-600 text-white"
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {deleting ? "Deleting..." : "Delete"}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

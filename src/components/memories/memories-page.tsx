@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Camera, Plus } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Camera, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,38 +23,65 @@ export interface Memory {
   };
 }
 
-export function MemoriesPage() {
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export function MemoriesPage({ currentUserId }: { currentUserId: string }) {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  async function fetchMemories() {
+  const fetchMemories = useCallback(async (page = 1, append = false) => {
     try {
-      const res = await fetch("/api/memories");
+      const res = await fetch(`/api/memories?page=${page}&limit=20`);
       if (res.ok) {
         const data = await res.json();
-        setMemories(data.data?.memories ?? []);
+        const newMemories = data.data?.memories ?? [];
+        const pag = data.data?.pagination;
+        setMemories((prev) => (append ? [...prev, ...newMemories] : newMemories));
+        setPagination(pag ?? null);
       }
     } catch {
       // silently fail
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    fetchMemories();
-  }, []);
+    fetchMemories(1);
+  }, [fetchMemories]);
+
+  function handleLoadMore() {
+    if (!pagination?.hasNext || loadingMore) return;
+    setLoadingMore(true);
+    fetchMemories(pagination.page + 1, true);
+  }
 
   function handleMemoryAdded(memory: Memory) {
     setMemories((prev) => [memory, ...prev]);
+    setPagination((prev) =>
+      prev ? { ...prev, total: prev.total + 1 } : prev
+    );
     setAddDialogOpen(false);
   }
 
   function handleMemoryDeleted(id: string) {
     setMemories((prev) => prev.filter((m) => m.id !== id));
     setSelectedMemory(null);
+    setPagination((prev) =>
+      prev ? { ...prev, total: prev.total - 1 } : prev
+    );
   }
 
   function handleMemoryUpdated(updated: Memory) {
@@ -72,7 +99,9 @@ export function MemoriesPage() {
             Our Memories
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Cherished moments you&apos;ve shared together
+            {pagination?.total
+              ? `${pagination.total} moment${pagination.total === 1 ? "" : "s"} shared`
+              : "Cherished moments you've shared together"}
           </p>
         </div>
         <Button
@@ -110,20 +139,38 @@ export function MemoriesPage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {memories.map((memory) => (
-            <MemoryCard
-              key={memory.id}
-              memory={memory}
-              onClick={() => setSelectedMemory(memory)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {memories.map((memory) => (
+              <MemoryCard
+                key={memory.id}
+                memory={memory}
+                onClick={() => setSelectedMemory(memory)}
+              />
+            ))}
+          </div>
+
+          {pagination?.hasNext && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {loadingMore ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {selectedMemory && (
         <MemoryDetail
           memory={selectedMemory}
+          currentUserId={currentUserId}
           open={!!selectedMemory}
           onOpenChange={(open) => {
             if (!open) setSelectedMemory(null);

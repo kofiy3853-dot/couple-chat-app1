@@ -1,8 +1,7 @@
 "use client";
 
-import { Camera, Pencil, Trash2 } from "lucide-react";
+import { Camera } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Memory } from "./memories-page";
 

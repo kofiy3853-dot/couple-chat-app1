@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import type { Memory } from "./memories-page";
 
 interface AddMemoryDialogProps {
@@ -34,6 +35,7 @@ export function AddMemoryDialog({
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ title?: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -64,24 +66,49 @@ export function AddMemoryDialog({
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("title", title.trim());
-      if (description.trim()) formData.append("description", description.trim());
-      if (date) formData.append("date", date);
-      if (imageFile) formData.append("image", imageFile);
+      let imageUrl: string | undefined;
+
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => null);
+          throw new Error(err?.error?.message || "Image upload failed");
+        }
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.data?.url;
+      }
 
       const res = await fetch("/api/memories", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          date: date || undefined,
+          imageUrl,
+        }),
       });
 
-      if (res.ok) {
-        const memory = await res.json();
-        onAdded(memory);
-        resetForm();
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error?.message || "Failed to create memory");
       }
-    } catch {
-      // silently fail
+
+      const data = await res.json();
+      onAdded(data.data);
+      toast({ title: "Memory created", description: "Your memory has been saved." });
+      resetForm();
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
