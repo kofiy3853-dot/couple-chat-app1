@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Smile, Mic, X } from "lucide-react";
+import { Send, Smile, Mic, X, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/hooks/use-voice-recorder";
@@ -11,6 +11,7 @@ interface MessageInputProps {
   onTypingStart: () => void;
   onTypingStop: () => void;
   onVoiceRecording?: (blob: Blob) => void;
+  onAttachment?: () => void;
   replyTo?: { id: string; content: string; senderName: string } | null;
   onCancelReply?: () => void;
   sending: boolean;
@@ -21,6 +22,7 @@ export function MessageInput({
   onTypingStart,
   onTypingStop,
   onVoiceRecording,
+  onAttachment,
   replyTo,
   onCancelReply,
   sending,
@@ -29,6 +31,7 @@ export function MessageInput({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -142,7 +145,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="flex items-end gap-2 px-4 py-3">
+      <div className="flex items-end gap-1.5 px-3 py-2">
         {isRecording ? (
           <div className="flex-1 flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -156,20 +159,42 @@ export function MessageInput({
               variant="ghost"
               size="icon"
               onClick={cancelRecording}
-              className="text-gray-500"
+              className="text-gray-500 h-8 w-8"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
             <Button
               size="icon"
               onClick={stopRecording}
-              className="bg-rose-500 hover:bg-rose-600 text-white rounded-full"
+              className="bg-rose-500 hover:bg-rose-600 text-white rounded-full h-8 w-8"
             >
-              <Send className="h-5 w-5" />
+              <Send className="h-4 w-4" />
             </Button>
           </div>
         ) : (
           <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,audio/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  onAttachment?.();
+                  e.target.value = "";
+                }
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-gray-400 hover:text-rose-500 rounded-full h-9 w-9 shrink-0"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef}
@@ -179,15 +204,15 @@ export function MessageInput({
                 placeholder="Type a message..."
                 rows={1}
                 className={cn(
-                  "w-full resize-none rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500",
+                  "w-full resize-none rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500",
                   "focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500",
-                  "max-h-32 overflow-y-auto"
+                  "max-h-20 overflow-y-auto"
                 )}
-                style={{ height: "auto", minHeight: "40px" }}
+                style={{ height: "36px" }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "auto";
-                  target.style.height = Math.min(target.scrollHeight, 128) + "px";
+                  target.style.height = "36px";
+                  target.style.height = Math.min(target.scrollHeight, 80) + "px";
                 }}
               />
             </div>
@@ -197,16 +222,16 @@ export function MessageInput({
                 size="icon"
                 onClick={handleSend}
                 disabled={sending}
-                className="bg-rose-500 hover:bg-rose-600 text-white rounded-full shrink-0"
+                className="bg-rose-500 hover:bg-rose-600 text-white rounded-full shrink-0 h-9 w-9"
               >
-                <Send className="h-5 w-5" />
+                <Send className="h-4 w-4" />
               </Button>
             ) : (
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={startRecording}
-                className="text-gray-500 hover:text-rose-500 rounded-full shrink-0"
+                className="text-gray-400 hover:text-rose-500 rounded-full shrink-0 h-9 w-9"
               >
                 <Mic className="h-5 w-5" />
               </Button>
