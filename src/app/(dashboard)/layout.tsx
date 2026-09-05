@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { DashboardLayoutClient, MainContentWrapper, ContentArea } from "@/components/layout/dashboard-layout-client";
+import { NotificationListener } from "@/components/notifications/notification-listener";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -31,25 +32,27 @@ export default async function DashboardLayout({
   const hasCouple = !!coupleMember;
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      <Sidebar
-        hasCouple={hasCouple}
-        user={currentUser}
-      />
+    <NotificationListener>
+      <div className="h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
+        <Sidebar
+          hasCouple={hasCouple}
+          user={currentUser}
+        />
 
-      <MainContentWrapper>
-        <DashboardLayoutClient user={currentUser}>
-          <Header user={currentUser} />
-        </DashboardLayoutClient>
+        <MainContentWrapper>
+          <DashboardLayoutClient user={currentUser}>
+            <Header user={currentUser} />
+          </DashboardLayoutClient>
 
-        <DashboardLayoutClient user={currentUser} mainOnly>
-          <ContentArea>
-            {children}
-          </ContentArea>
-        </DashboardLayoutClient>
-      </MainContentWrapper>
+          <DashboardLayoutClient user={currentUser} mainOnly>
+            <ContentArea>
+              {children}
+            </ContentArea>
+          </DashboardLayoutClient>
+        </MainContentWrapper>
 
-      <MobileNav hasCouple={hasCouple} />
-    </div>
+        <MobileNav hasCouple={hasCouple} />
+      </div>
+    </NotificationListener>
   );
 }

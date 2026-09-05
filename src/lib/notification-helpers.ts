@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { sendPushNotification } from "@/lib/push-notifications";
 import type { NotificationType } from "@prisma/client";
 
 const PREF_MAP: Record<NotificationType, string> = {
@@ -38,6 +39,14 @@ export async function createNotification(params: CreateNotificationParams): Prom
         link: params.link ?? null,
       },
     });
+
+    // Send push notification (fire and forget)
+    sendPushNotification(params.userId, {
+      title: params.title,
+      body: params.message,
+      url: params.link || "/notifications",
+    }).catch(() => {});
+
     return true;
   } catch (error) {
     console.error("[Notification] createNotification error:", error);
@@ -77,6 +86,15 @@ export async function createNotificationMany(
       link: link ?? null,
     })),
   });
+
+  // Send push notifications (fire and forget)
+  for (const userId of enabledUserIds) {
+    sendPushNotification(userId, {
+      title,
+      body: message,
+      url: link || "/notifications",
+    }).catch(() => {});
+  }
 
   return result.count;
 }

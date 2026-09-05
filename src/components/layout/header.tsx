@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/logout";
-import { Bell, Settings, LogOut, Loader2 } from "lucide-react";
+import { Settings, LogOut, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 interface HeaderUser {
   id: string;
@@ -69,12 +70,7 @@ export function Header({ user }: HeaderProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" asChild className="relative">
-          <Link href="/notifications">
-            <Bell className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500" />
-          </Link>
-        </Button>
+        <NotificationBell />
 
         <Button variant="ghost" size="icon" asChild className="hidden sm:inline-flex">
           <Link href="/settings">

@@ -26,6 +26,7 @@ model User {
   sentMessages        Message[]
   messageReactions    MessageReaction[]
   notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
   memoriesCreated     Memory[]
   timelineEventsCreated TimelineEvent[]
   coupleInvitationsCreated CoupleInvitation[] @relation("Creator")
@@ -211,6 +212,21 @@ model Notification {
 
   @@index([userId])
   @@index([read])
+}
+
+model PushSubscription {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  endpoint     String   @db.Text
+  p256dh       String   @db.Text
+  auth         String   @db.Text
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
 }
 
 // ─── Moderation ──────────────────────────────────────────────────────────────
