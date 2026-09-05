@@ -8,7 +8,7 @@ import { Camera, Loader2, X } from "lucide-react";
 interface AvatarUploadProps {
   currentImage: string | null;
   name: string | null;
-  onUpload: (url: string) => void;
+  onUpload: (dataUrl: string) => void;
   onRemove: () => void;
 }
 
@@ -21,9 +21,6 @@ export function AvatarUpload({ currentImage, name, onUpload, onRemove }: AvatarU
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const objectUrl = URL.createObjectURL(file);
-    setPreview(objectUrl);
-
     setUploading(true);
     try {
       const formData = new FormData();
@@ -33,12 +30,11 @@ export function AvatarUpload({ currentImage, name, onUpload, onRemove }: AvatarU
       const data = await res.json();
 
       if (data.success) {
+        setPreview(data.data.url);
         onUpload(data.data.url);
-      } else {
-        setPreview(null);
       }
     } catch {
-      setPreview(null);
+      // upload failed
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -82,12 +78,12 @@ export function AvatarUpload({ currentImage, name, onUpload, onRemove }: AvatarU
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
           {currentImage ? "Change photo" : "Upload photo"}
         </p>
-        <p className="text-xs text-gray-500">JPEG, PNG, GIF or WebP. Max 5MB.</p>
+        <p className="text-xs text-gray-500">JPEG, PNG, GIF or WebP. Max 2MB.</p>
         {currentImage && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={onRemove}
+            onClick={() => { setPreview(null); onRemove(); }}
             className="text-red-500 hover:text-red-600 h-7 px-2"
           >
             <X className="h-3 w-3 mr-1" />
