@@ -51,6 +51,7 @@ interface TimelineEvent {
 
 interface DashboardContentProps {
   userName: string;
+  userImage: string | null;
   partner: Partner;
   daysTogether: number | null;
   messageCount: number;
@@ -65,6 +66,7 @@ interface DashboardContentProps {
 
 export function DashboardContent({
   userName,
+  userImage,
   partner,
   daysTogether,
   messageCount,
@@ -90,6 +92,7 @@ export function DashboardContent({
         <div className="flex items-center gap-4">
           <div className="flex items-center -space-x-3">
             <Avatar className="h-12 w-12 border-2 border-white dark:border-gray-900 ring-2 ring-rose-400">
+              <AvatarImage src={userImage || undefined} alt={userName} />
               <AvatarFallback className="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 text-sm font-semibold">
                 {userName[0]?.toUpperCase()}
               </AvatarFallback>

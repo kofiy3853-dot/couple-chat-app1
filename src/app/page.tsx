@@ -40,6 +40,7 @@ async function DashboardShell({
     <DashboardPageShell currentUser={currentUser}>
       <DashboardContent
         userName={currentUser.name?.split(" ")[0] || "there"}
+        userImage={currentUser.image}
         partner={{ name: data.partner.name, image: data.partner.image }}
         daysTogether={data.daysTogether}
         messageCount={data.messageCount}

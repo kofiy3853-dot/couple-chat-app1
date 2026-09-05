@@ -11,7 +11,7 @@ export default async function DashboardIndexPage() {
 
   const currentUser = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, image: true },
   });
 
   if (!currentUser) {
@@ -27,6 +27,7 @@ export default async function DashboardIndexPage() {
   return (
     <DashboardContent
       userName={currentUser.name?.split(" ")[0] || "there"}
+      userImage={currentUser.image}
       partner={{ name: data.partner.name, image: data.partner.image }}
       daysTogether={data.daysTogether}
       messageCount={data.messageCount}
