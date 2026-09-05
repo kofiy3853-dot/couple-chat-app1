@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Calendar, Plus } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Calendar, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,36 +22,65 @@ export interface TimelineEventItem {
   };
 }
 
-export function TimelinePage() {
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export function TimelinePage({ currentUserId }: { currentUserId: string }) {
   const [events, setEvents] = useState<TimelineEventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  async function fetchEvents() {
+  const fetchEvents = useCallback(async (page = 1, append = false) => {
     try {
-      const res = await fetch("/api/timeline");
+      const res = await fetch(`/api/timeline?page=${page}&limit=50`);
       if (res.ok) {
         const data = await res.json();
-        setEvents(data.data?.events ?? []);
+        const newEvents = data.data?.events ?? [];
+        const pag = data.data?.pagination;
+        setEvents((prev) => (append ? [...prev, ...newEvents] : newEvents));
+        setPagination(pag ?? null);
       }
     } catch {
       // silently fail
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }
-
-  useEffect(() => {
-    fetchEvents();
   }, []);
 
+  useEffect(() => {
+    fetchEvents(1);
+  }, [fetchEvents]);
+
+  function handleLoadMore() {
+    if (!pagination?.hasNext || loadingMore) return;
+    setLoadingMore(true);
+    fetchEvents(pagination.page + 1, true);
+  }
+
   function handleEventAdded(event: TimelineEventItem) {
-    setEvents((prev) => [...prev, event].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+    setEvents((prev) =>
+      [...prev, event].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    );
+    setPagination((prev) =>
+      prev ? { ...prev, total: prev.total + 1 } : prev
+    );
     setAddDialogOpen(false);
   }
 
   function handleEventDeleted(id: string) {
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    setPagination((prev) =>
+      prev ? { ...prev, total: prev.total - 1 } : prev
+    );
   }
 
   function handleEventUpdated(updated: TimelineEventItem) {
@@ -70,7 +99,9 @@ export function TimelinePage() {
             Our Timeline
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            The story of your journey together
+            {pagination?.total
+              ? `${pagination.total} event${pagination.total === 1 ? "" : "s"} in your story`
+              : "The story of your journey together"}
           </p>
         </div>
         <Button
@@ -117,22 +148,40 @@ export function TimelinePage() {
           />
         </div>
       ) : (
-        <div className="relative">
-          {/* Vertical connector line */}
-          <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
+        <>
+          <div className="relative">
+            {/* Vertical connector line */}
+            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
 
-          <div className="space-y-8">
-            {events.map((event, index) => (
-              <TimelineEvent
-                key={event.id}
-                event={event}
-                index={index}
-                onDeleted={handleEventDeleted}
-                onUpdated={handleEventUpdated}
-              />
-            ))}
+            <div className="space-y-8">
+              {events.map((event, index) => (
+                <TimelineEvent
+                  key={event.id}
+                  event={event}
+                  index={index}
+                  currentUserId={currentUserId}
+                  onDeleted={handleEventDeleted}
+                  onUpdated={handleEventUpdated}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+
+          {pagination?.hasNext && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {loadingMore ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       <AddEventDialog

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import type { TimelineEventItem } from "./timeline-page";
 
 interface AddEventDialogProps {
@@ -32,8 +33,9 @@ export function AddEventDialog({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ title?: string; description?: string; date?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -52,10 +54,8 @@ export function AddEventDialog({
   }
 
   function validate() {
-    const newErrors: { title?: string; description?: string; date?: string } = {};
+    const newErrors: { title?: string } = {};
     if (!title.trim()) newErrors.title = "Title is required";
-    if (!description.trim()) newErrors.description = "Description is required";
-    if (!date) newErrors.date = "Date is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
@@ -66,24 +66,49 @@ export function AddEventDialog({
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("title", title.trim());
-      formData.append("description", description.trim());
-      formData.append("date", date);
-      if (imageFile) formData.append("image", imageFile);
+      let imageUrl: string | undefined;
+
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => null);
+          throw new Error(err?.error?.message || "Image upload failed");
+        }
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.data?.url;
+      }
 
       const res = await fetch("/api/timeline", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          date: date || undefined,
+          imageUrl,
+        }),
       });
 
-      if (res.ok) {
-        const event = await res.json();
-        onAdded(event);
-        resetForm();
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error?.message || "Failed to create event");
       }
-    } catch {
-      // silently fail
+
+      const data = await res.json();
+      onAdded(data.data);
+      toast({ title: "Event created", description: "Your timeline event has been saved." });
+      resetForm();
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -124,7 +149,7 @@ export function AddEventDialog({
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
-                if (errors.title) setErrors((prev) => ({ ...prev, title: undefined }));
+                if (errors.title) setErrors({});
               }}
               placeholder="First date"
               className={errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}
@@ -136,39 +161,25 @@ export function AddEventDialog({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Description <span className="text-rose-500">*</span>
+              Description
             </label>
             <Textarea
               value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                if (errors.description) setErrors((prev) => ({ ...prev, description: undefined }));
-              }}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="What happened on this special day?"
               rows={3}
-              className={errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
-            {errors.description && (
-              <p className="text-sm text-red-500 mt-1">{errors.description}</p>
-            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Date <span className="text-rose-500">*</span>
+              Date
             </label>
             <Input
               type="date"
               value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-                if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
-              }}
-              className={errors.date ? "border-red-500 focus-visible:ring-red-500" : ""}
+              onChange={(e) => setDate(e.target.value)}
             />
-            {errors.date && (
-              <p className="text-sm text-red-500 mt-1">{errors.date}</p>
-            )}
           </div>
 
           <div>
