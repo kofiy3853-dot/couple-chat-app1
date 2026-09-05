@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, successResponse, errorResponse } from "@/lib/api-utils";
+import { requireAuth, successResponse, errorResponse, getCurrentUser } from "@/lib/api-utils";
 import { ValidationError, ForbiddenError } from "@/lib/errors";
 import { memorySchema } from "@/lib/validation";
 
@@ -14,12 +14,16 @@ async function getCoupleId(userId: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth();
+    const user = await getCurrentUser();
+    if (!user) {
+      return successResponse({ memories: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
+    }
+
     const { searchParams } = new URL(request.url);
 
     const coupleId = await getCoupleId(user.id);
     if (!coupleId) {
-      throw new ForbiddenError("You are not part of a couple");
+      return successResponse({ memories: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
     }
 
     const page = Math.max(parseInt(searchParams.get("page") ?? "1", 10), 1);
