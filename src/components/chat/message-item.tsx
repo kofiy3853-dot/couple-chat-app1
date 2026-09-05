@@ -187,6 +187,26 @@ export function MessageItem({
             )}
           </div>
 
+          {isOwn && (
+            <div className="flex items-center gap-0.5 mt-0.5 px-1">
+              {message.readAt ? (
+                <svg className="w-3.5 h-3.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 12 5 16 12 6" />
+                  <polyline points="7 12 11 16 20 6" />
+                </svg>
+              ) : message.deliveredAt ? (
+                <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 12 5 16 12 6" />
+                  <polyline points="7 12 11 16 20 6" />
+                </svg>
+              ) : (
+                <svg className="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 12 9 17 20 6" />
+                </svg>
+              )}
+            </div>
+          )}
+
           {Object.keys(groupedReactions).length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {Object.values(groupedReactions).map((r) => (

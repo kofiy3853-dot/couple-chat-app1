@@ -13,6 +13,7 @@ interface UseSocketOptions {
   onReactionAdded?: (data: { messageId: string; userId: string; userName?: string; emoji: string }) => void;
   onReactionRemoved?: (data: { messageId: string; userId: string; emoji: string }) => void;
   onNewNotification?: (notification: { id: string; type: string; title: string; message: string; link: string | null; read: boolean; createdAt: string }) => void;
+  onMessagesRead?: (data: { conversationId: string; readBy: string; lastReadMessageId: string }) => void;
   onGameChallengeReceived?: (data: { fromUserId: string; fromUserName: string; game: string; type?: unknown }) => void;
   onGameChoiceMade?: (data: { fromUserId: string; fromUserName: string; game: string; payload?: unknown }) => void;
   onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; game: string; question: string; type?: unknown }) => void;
@@ -20,7 +21,7 @@ interface UseSocketOptions {
   onGameEnded?: (data: { fromUserId: string; game: string }) => void;
 }
 
-export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onNewNotification, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onNewNotification, onMessagesRead, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const [reconnectFailed, setReconnectFailed] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
@@ -34,6 +35,7 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   const onReactionAddedRef = useRef(onReactionAdded);
   const onReactionRemovedRef = useRef(onReactionRemoved);
   const onNewNotificationRef = useRef(onNewNotification);
+  const onMessagesReadRef = useRef(onMessagesRead);
   const onGameChallengeReceivedRef = useRef(onGameChallengeReceived);
   const onGameChoiceMadeRef = useRef(onGameChoiceMade);
   const onGameQuestionReceivedRef = useRef(onGameQuestionReceived);
@@ -46,6 +48,7 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   useEffect(() => { onReactionAddedRef.current = onReactionAdded; }, [onReactionAdded]);
   useEffect(() => { onReactionRemovedRef.current = onReactionRemoved; }, [onReactionRemoved]);
   useEffect(() => { onNewNotificationRef.current = onNewNotification; }, [onNewNotification]);
+  useEffect(() => { onMessagesReadRef.current = onMessagesRead; }, [onMessagesRead]);
   useEffect(() => { onGameChallengeReceivedRef.current = onGameChallengeReceived; }, [onGameChallengeReceived]);
   useEffect(() => { onGameChoiceMadeRef.current = onGameChoiceMade; }, [onGameChoiceMade]);
   useEffect(() => { onGameQuestionReceivedRef.current = onGameQuestionReceived; }, [onGameQuestionReceived]);
@@ -155,6 +158,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onNewNotificationRef.current?.(data);
     });
 
+    const unsubMessagesRead = client.on("messages-read", (data: { conversationId: string; readBy: string; lastReadMessageId: string }) => {
+      onMessagesReadRef.current?.(data);
+    });
+
     const unsubGameChallenge = client.on("game-challenge-received", (data: { fromUserId: string; fromUserName: string; game: string; type?: unknown }) => {
       onGameChallengeReceivedRef.current?.(data);
     });
@@ -196,6 +203,7 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       unsubReactionAdded();
       unsubReactionRemoved();
       unsubNewNotification();
+      unsubMessagesRead();
       unsubGameChallenge();
       unsubGameChoice();
       unsubGameQuestion();
@@ -297,6 +305,13 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
+  const markDelivered = useCallback(
+    (messageId: string, conversationId: string) => {
+      clientRef.current?.getSocket()?.emit("message-delivered", { messageId, conversationId });
+    },
+    []
+  );
+
   // ─── Game methods ──────────────────────────────────────────────────────
   const emitGameStart = useCallback(
     (conversationId: string, game: string, payload?: unknown) => {
@@ -349,6 +364,7 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     startCall,
     endCall,
     markAsRead,
+    markDelivered,
     startGame: emitGameStart,
     makeChoice: emitGameChoice,
     sendQuestion: emitGameQuestion,

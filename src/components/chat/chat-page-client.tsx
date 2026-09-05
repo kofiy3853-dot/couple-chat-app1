@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { useChat, type Message } from "@/hooks/use-chat";
 import { ChatHeader } from "./chat-header";
@@ -39,6 +39,8 @@ export function ChatPageClient({
     addRealtimeMessage,
     applyReactionAdded,
     applyReactionRemoved,
+    applyMessagesRead,
+    applyMessageDelivered,
   } = useChat({
     conversationId,
     userId,
@@ -69,6 +71,13 @@ export function ChatPageClient({
     [userId, applyReactionRemoved]
   );
 
+  const handleMessagesRead = useCallback(
+    (data: { conversationId: string; readBy: string; lastReadMessageId: string }) => {
+      applyMessagesRead(data);
+    },
+    [applyMessagesRead]
+  );
+
   const {
     connected,
     reconnectFailed,
@@ -80,13 +89,36 @@ export function ChatPageClient({
     broadcastMessageDeleted,
     broadcastMessageEdited,
     broadcastReactionToggled,
+    markAsRead,
+    markDelivered,
   } = useSocket({
     conversationId,
     userId,
     onNewMessage: handleNewMessage,
     onReactionAdded: handleReactionAdded,
     onReactionRemoved: handleReactionRemoved,
+    onMessagesRead: handleMessagesRead,
   });
+
+  // Mark messages as read when partner opens chat
+  const lastReadRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!conversationId || !connected || loading || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.senderId === userId) return;
+    if (lastReadRef.current === lastMsg.id) return;
+    lastReadRef.current = lastMsg.id;
+    markAsRead(conversationId, lastMsg.id);
+  }, [conversationId, connected, loading, messages, userId, markAsRead]);
+
+  // Auto-deliver incoming messages
+  useEffect(() => {
+    if (!conversationId || !connected) return;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.senderId === userId) return;
+    if (lastMsg.deliveredAt) return;
+    markDelivered(lastMsg.id, conversationId);
+  }, [conversationId, connected, messages, userId, markDelivered]);
 
   const handleSend = async (content: string) => {
     if (!conversationId) return;

@@ -122,6 +122,8 @@ model Message {
   isEdited       Boolean     @default(false)
   replyToId      String?     @db.Uuid
   deletedAt      DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

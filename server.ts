@@ -395,6 +395,12 @@ app.prepare().then(() => {
       if (!messageId || !conversationId) return;
       const { isMember } = await isConversationMember(userId, conversationId);
       if (!isMember) return;
+      try {
+        await db.message.update({
+          where: { id: messageId },
+          data: { deliveredAt: new Date() },
+        });
+      } catch {}
       io.to(`conversation:${conversationId}`).emit("message-delivered", { messageId, deliveredBy: userId });
     });
 
@@ -406,8 +412,21 @@ app.prepare().then(() => {
       if (!isMember) return;
 
       // Verify the message belongs to this conversation
-      const msg = await db.message.findUnique({ where: { id: lastReadMessageId }, select: { conversationId: true } });
+      const msg = await db.message.findUnique({ where: { id: lastReadMessageId }, select: { conversationId: true, createdAt: true } });
       if (!msg || msg.conversationId !== conversationId) return;
+
+      // Mark all messages up to lastReadMessageId as read (from the OTHER person)
+      try {
+        await db.message.updateMany({
+          where: {
+            conversationId,
+            senderId: { not: userId },
+            readAt: null,
+            createdAt: { lte: msg.createdAt },
+          },
+          data: { readAt: new Date() },
+        });
+      } catch {}
 
       try {
         if (isGroup) {

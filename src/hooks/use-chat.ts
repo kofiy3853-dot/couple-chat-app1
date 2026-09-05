@@ -28,6 +28,8 @@ interface Message {
   content: string;
   type: "TEXT" | "IMAGE" | "AUDIO";
   deletedAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
   createdAt: string;
   updatedAt: string;
   isEdited: boolean;
@@ -159,6 +161,28 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
+
+  const applyMessagesRead = useCallback((data: { readBy: string; lastReadMessageId: string }) => {
+    if (data.readBy === userId) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.senderId !== userId) return m;
+        if (m.readAt) return m;
+        return { ...m, readAt: new Date().toISOString() };
+      })
+    );
+  }, [userId]);
+
+  const applyMessageDelivered = useCallback((data: { messageId: string; deliveredBy: string }) => {
+    if (data.deliveredBy === userId) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== data.messageId) return m;
+        if (m.deliveredAt) return m;
+        return { ...m, deliveredAt: new Date().toISOString() };
+      })
+    );
+  }, [userId]);
 
   const fetchMessages = useCallback(
     async (cursorParam?: string | null, prepend = false) => {
@@ -360,6 +384,8 @@ export function useChat({ conversationId, userId, broadcasters }: UseChatOptions
     markMessageEdited,
     applyReactionAdded,
     applyReactionRemoved,
+    applyMessagesRead,
+    applyMessageDelivered,
     clearMessages,
   };
 }
