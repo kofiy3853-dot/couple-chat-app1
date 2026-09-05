@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { MoreHorizontal, SmilePlus, Pencil, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { getInitials, formatRelativeTime, formatFullTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ReactionPicker } from "./reaction-picker";
 import type { Message } from "@/hooks/use-chat";
@@ -204,6 +204,9 @@ export function MessageItem({
                   <polyline points="4 12 9 17 20 6" />
                 </svg>
               )}
+              <span className="text-[10px] text-gray-400 ml-0.5" title={formatFullTime(message.createdAt)}>
+                {formatRelativeTime(message.createdAt)}
+              </span>
             </div>
           )}
 

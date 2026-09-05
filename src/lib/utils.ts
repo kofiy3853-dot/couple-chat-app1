@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { format, formatDistanceToNow, isToday, isYesterday, isThisYear } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -16,6 +16,14 @@ export function formatDate(date: Date | string): string {
 export function formatRelativeTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return formatDistanceToNow(d, { addSuffix: true });
+}
+
+export function formatFullTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (isToday(d)) return `Today at ${format(d, "h:mm a")}`;
+  if (isYesterday(d)) return `Yesterday at ${format(d, "h:mm a")}`;
+  if (isThisYear(d)) return format(d, "MMM d 'at' h:mm a");
+  return format(d, "MMM d, yyyy 'at' h:mm a");
 }
 
 export function truncateText(text: string, maxLength: number): string {
