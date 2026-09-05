@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { MoreHorizontal, SmilePlus, Pencil, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, formatRelativeTime, formatFullTime } from "@/lib/utils";
@@ -35,8 +35,32 @@ export function MessageItem({
   const [editContent, setEditContent] = useState(message.content);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDeleted = !!message.deletedAt;
+
+  // Long press handler for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    longPressTimer.current = setTimeout(() => {
+      setShowActions(true);
+      // Prevent text selection on long press
+      e.preventDefault();
+    }, 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
 
   const groupedReactions = useMemo(() => {
     return message.reactions.reduce(
@@ -58,6 +82,13 @@ export function MessageItem({
       el.style.height = Math.min(el.scrollHeight, 120) + "px";
     }
   }, [isEditing, editContent]);
+
+  // Cleanup long press timer
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
 
   const handleEditSubmit = () => {
     const trimmed = editContent.trim();
@@ -81,6 +112,10 @@ export function MessageItem({
     <div
       className={cn("flex px-4 py-1 group", isOwn ? "justify-end" : "justify-start")}
       onMouseLeave={() => { setShowActions(false); setConfirmDelete(false); }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
+      onContextMenu={(e) => { e.preventDefault(); setShowActions(true); }}
     >
       <div className={cn("flex gap-2 max-w-[75%]", isOwn && "flex-row-reverse")}>
         {!isOwn && showSender && (
