@@ -38,7 +38,7 @@ export function ChatHeader({
     <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
       <Link
         href="/"
-        className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors lg:hidden"
+        className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
         <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
       </Link>

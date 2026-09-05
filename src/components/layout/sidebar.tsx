@@ -56,7 +56,7 @@ export function Sidebar({ user, hasCouple }: SidebarProps) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
+  const isChatPage = pathname === "/chat" || pathname.startsWith("/chat/");
 
   const initials = user.name
     ?.split(" ")
