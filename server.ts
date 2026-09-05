@@ -48,6 +48,13 @@ app.prepare().then(() => {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
+    allowEIO3: true,
+  });
+
+  // Suppress benign Socket.IO parse errors from transport upgrades/extensions
+  io.engine.on("connection_error", (err: { message: string }) => {
+    if (err.message.includes("JSON")) return;
+    console.error("[WS] Engine error:", err.message);
   });
 
   // ─── Redis adapter (optional) ──────────────────────────────────────────────
