@@ -209,24 +209,24 @@ class WebSocketClient {
   }
 
   // ─── Game methods ──────────────────────────────────────────────────────
-  startGame(conversationId: string, type: "truth" | "dare"): void {
-    this.socket?.emit("game-start", { conversationId, type });
+  emitGameStart(conversationId: string, game: string, payload?: unknown): void {
+    this.socket?.emit("game-start", { conversationId, game, payload });
   }
 
-  makeChoice(conversationId: string, type: "truth" | "dare"): void {
-    this.socket?.emit("game-choice", { conversationId, type });
+  emitGameChoice(conversationId: string, game: string, payload: unknown): void {
+    this.socket?.emit("game-choice", { conversationId, game, payload });
   }
 
-  sendQuestion(conversationId: string, question: string, type: "truth" | "dare"): void {
-    this.socket?.emit("game-question", { conversationId, question, type });
+  emitGameQuestion(conversationId: string, game: string, question: string, payload?: unknown): void {
+    this.socket?.emit("game-question", { conversationId, game, question, payload });
   }
 
-  sendAnswer(conversationId: string, completed: boolean): void {
-    this.socket?.emit("game-answer", { conversationId, completed });
+  emitGameAnswer(conversationId: string, game: string, completed: boolean, payload?: unknown): void {
+    this.socket?.emit("game-answer", { conversationId, game, completed, payload });
   }
 
-  endGame(conversationId: string): void {
-    this.socket?.emit("game-end", { conversationId });
+  emitGameEnd(conversationId: string, game: string): void {
+    this.socket?.emit("game-end", { conversationId, game });
   }
 
   // ─── Event emitter ──────────────────────────────────────────────────────

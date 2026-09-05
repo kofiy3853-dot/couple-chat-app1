@@ -65,11 +65,11 @@ type GamePhase =
   | "game-over";
 
 interface SocketActions {
-  startGame: (conversationId: string, type: "truth" | "dare") => void;
-  makeChoice: (conversationId: string, type: "truth" | "dare") => void;
-  sendQuestion: (conversationId: string, question: string, type: "truth" | "dare") => void;
-  sendAnswer: (conversationId: string, completed: boolean) => void;
-  endGame: (conversationId: string) => void;
+  startGame: (conversationId: string, game: string, payload?: unknown) => void;
+  makeChoice: (conversationId: string, game: string, payload: unknown) => void;
+  sendQuestion: (conversationId: string, game: string, question: string, payload?: unknown) => void;
+  sendAnswer: (conversationId: string, game: string, completed: boolean, payload?: unknown) => void;
+  endGame: (conversationId: string, game: string) => void;
 }
 
 interface TruthOrDareProps {
@@ -93,40 +93,40 @@ export function TruthOrDare({ onBack, conversationId, userId, connected, socketA
 
   useEffect(() => {
     onRegisterHandlers("onGameChallengeReceived", (data: unknown) => {
-      const d = data as { fromUserId: string; fromUserName: string; type: "truth" | "dare" };
-      if (d.fromUserId === userId) return;
+      const d = data as { fromUserId: string; fromUserName: string; game: string; type?: { type: "truth" | "dare" } };
+      if (d.fromUserId === userId || d.game !== "truth-or-dare") return;
       setPartnerName(d.fromUserName);
-      setChallengeType(d.type);
+      setChallengeType(d.type?.type ?? null);
       setPhase("partner-sent-choice");
     });
 
     onRegisterHandlers("onGameChoiceMade", (data: unknown) => {
-      const d = data as { fromUserId: string; fromUserName: string; type: "truth" | "dare" };
-      if (d.fromUserId === userId) return;
-      setChallengeType(d.type);
+      const d = data as { fromUserId: string; fromUserName: string; game: string; payload?: { type: "truth" | "dare" } };
+      if (d.fromUserId === userId || d.game !== "truth-or-dare") return;
+      setChallengeType(d.payload?.type ?? null);
       setPhase("pick-question");
     });
 
     onRegisterHandlers("onGameQuestionReceived", (data: unknown) => {
-      const d = data as { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" };
-      if (d.fromUserId === userId) return;
+      const d = data as { fromUserId: string; fromUserName: string; game: string; question: string; type?: { type: "truth" | "dare" } };
+      if (d.fromUserId === userId || d.game !== "truth-or-dare") return;
       setSelectedQuestion(d.question);
-      setChallengeType(d.type);
+      setChallengeType(d.type?.type ?? null);
       setPartnerName(d.fromUserName);
       setPhase("received-question");
     });
 
     onRegisterHandlers("onGameAnswerResult", (data: unknown) => {
-      const d = data as { fromUserId: string; fromUserName: string; completed: boolean };
-      if (d.fromUserId === userId) return;
+      const d = data as { fromUserId: string; fromUserName: string; game: string; completed: boolean };
+      if (d.fromUserId === userId || d.game !== "truth-or-dare") return;
       setLastResult({ completed: d.completed, by: d.fromUserName });
       if (d.completed) setPartnerScore((s) => s + 1);
       setPhase("round-result");
     });
 
     onRegisterHandlers("onGameEnded", (data: unknown) => {
-      const d = data as { fromUserId: string };
-      if (d.fromUserId === userId) return;
+      const d = data as { fromUserId: string; game: string };
+      if (d.fromUserId === userId || d.game !== "truth-or-dare") return;
       setPhase("game-over");
     });
   }, [userId, onRegisterHandlers]);
@@ -150,24 +150,24 @@ export function TruthOrDare({ onBack, conversationId, userId, connected, socketA
 
   const handleSendChallenge = (type: "truth" | "dare") => {
     setChallengeType(type);
-    socketActions.startGame(conversationId, type);
+    socketActions.startGame(conversationId, "truth-or-dare", { type });
     setPhase("waiting-partner-choice");
   };
 
   const handlePartnerChoice = (type: "truth" | "dare") => {
-    socketActions.makeChoice(conversationId, type);
+    socketActions.makeChoice(conversationId, "truth-or-dare", { type });
     setChallengeType(type);
     setPhase("pick-question");
   };
 
   const handleSelectQuestion = (question: string) => {
     setSelectedQuestion(question);
-    socketActions.sendQuestion(conversationId, question, challengeType!);
+    socketActions.sendQuestion(conversationId, "truth-or-dare", question, { type: challengeType });
     setPhase("waiting-partner-answer");
   };
 
   const handleAnswer = (completed: boolean) => {
-    socketActions.sendAnswer(conversationId, completed);
+    socketActions.sendAnswer(conversationId, "truth-or-dare", completed);
     if (completed) setMyScore((s) => s + 1);
     setLastResult({ completed, by: "You" });
     setPhase("round-result");
@@ -182,7 +182,7 @@ export function TruthOrDare({ onBack, conversationId, userId, connected, socketA
   };
 
   const handleEndGame = () => {
-    socketActions.endGame(conversationId);
+    socketActions.endGame(conversationId, "truth-or-dare");
     setPhase("game-over");
   };
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GameLayout } from "./game-layout";
-import { Star, RotateCcw, Heart, Share2 } from "lucide-react";
+import { Star, RotateCcw, Heart, Share2, Users } from "lucide-react";
 
 interface RateCategory {
   name: string;
@@ -50,10 +50,43 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-export function RateEachOther({ onBack }: { onBack: () => void }) {
+interface GameSocketActions {
+  startGame: (conversationId: string, game: string, payload?: unknown) => void;
+  makeChoice: (conversationId: string, game: string, payload: unknown) => void;
+  sendQuestion: (conversationId: string, game: string, question: string, payload?: unknown) => void;
+  sendAnswer: (conversationId: string, game: string, completed: boolean, payload?: unknown) => void;
+  endGame: (conversationId: string, game: string) => void;
+}
+
+interface RateEachOtherProps {
+  onBack: () => void;
+  conversationId: string | null;
+  userId: string;
+  connected: boolean;
+  socketActions: GameSocketActions;
+  onRegisterHandlers: (key: string, fn: (...args: unknown[]) => void) => void;
+}
+
+export function RateEachOther({ onBack, conversationId, userId, connected, socketActions, onRegisterHandlers }: RateEachOtherProps) {
   const [currentCategory, setCurrentCategory] = useState(0);
   const [ratings, setRatings] = useState<number[]>(new Array(categories.length).fill(0));
   const [gameOver, setGameOver] = useState(false);
+  const [partnerRatings, setPartnerRatings] = useState<Record<number, number>>({});
+  const [partnerName, setPartnerName] = useState("");
+
+  useEffect(() => {
+    onRegisterHandlers("onGameChoiceMade", (data: unknown) => {
+      const d = data as { fromUserId: string; fromUserName: string; game: string; payload?: { categoryIndex: number; rating: number } };
+      if (d.fromUserId === userId || d.game !== "rate-each-other" || !d.payload) return;
+      setPartnerName(d.fromUserName);
+      setPartnerRatings((prev) => ({ ...prev, [d.payload!.categoryIndex]: d.payload!.rating }));
+    });
+
+    onRegisterHandlers("onGameEnded", (data: unknown) => {
+      const d = data as { fromUserId: string; game: string };
+      if (d.fromUserId === userId || d.game !== "rate-each-other") return;
+    });
+  }, [userId, onRegisterHandlers]);
 
   const category = categories[currentCategory];
   const progress = ((currentCategory + 1) / categories.length) * 100;
@@ -62,11 +95,15 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
     const newRatings = [...ratings];
     newRatings[currentCategory] = value;
     setRatings(newRatings);
+    if (conversationId) {
+      socketActions.makeChoice(conversationId, "rate-each-other", { categoryIndex: currentCategory, rating: value });
+    }
   };
 
   const handleNext = () => {
     if (currentCategory + 1 >= categories.length) {
       setGameOver(true);
+      if (conversationId) socketActions.endGame(conversationId, "rate-each-other");
     } else {
       setCurrentCategory((c) => c + 1);
     }
@@ -80,11 +117,30 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
     setCurrentCategory(0);
     setRatings(new Array(categories.length).fill(0));
     setGameOver(false);
+    setPartnerRatings({});
   };
 
   const total = ratings.reduce((a, b) => a + b, 0);
   const avg = (total / categories.length).toFixed(1);
+  const partnerTotal = Object.values(partnerRatings).reduce((a, b) => a + b, 0);
+  const partnerCount = Object.keys(partnerRatings).length;
+  const partnerAvg = partnerCount > 0 ? (partnerTotal / partnerCount).toFixed(1) : "—";
   const shareText = `Our relationship scores:\n${categories.map((c, i) => `${c.icon} ${c.name}: ${ratings[i]}/5`).join("\n")}\nOverall: ${avg}/5 💕`;
+
+  if (!conversationId) {
+    return (
+      <GameLayout title="Rate Each Other" onBack={onBack}>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">No partner connected</h2>
+            <p className="text-gray-500 mb-4">You need to be in a couple to play Rate Each Other.</p>
+            <Button variant="outline" onClick={onBack}>Back to Games</Button>
+          </CardContent>
+        </Card>
+      </GameLayout>
+    );
+  }
 
   if (gameOver) {
     return (
@@ -93,20 +149,18 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
           <Card className="border-rose-200 bg-rose-50/50">
             <CardContent className="p-6 text-center">
               <Heart className="h-12 w-12 text-rose-500 mx-auto mb-3" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                Your Relationship Score
-              </h2>
-              <p className="text-4xl font-bold text-rose-500 mb-2">
-                {avg} <span className="text-lg text-gray-400">/ 5.0</span>
-              </p>
-              <p className="text-gray-500 mb-4">
-                {Number(avg) >= 4 ? "Incredible connection! 💕" : Number(avg) >= 3 ? "Strong relationship! 🌟" : "Keep building together! 💪"}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigator.clipboard?.writeText(shareText)}
-              >
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Relationship Score</h2>
+              <div className="flex gap-8 justify-center mb-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">You</p>
+                  <p className="text-3xl font-bold text-rose-500">{avg} <span className="text-lg text-gray-400">/ 5.0</span></p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">{partnerName || "Partner"}</p>
+                  <p className="text-3xl font-bold text-blue-500">{partnerAvg} <span className="text-lg text-gray-400">/ 5.0</span></p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigator.clipboard?.writeText(shareText)}>
                 <Share2 className="h-4 w-4 mr-2" /> Share Results
               </Button>
             </CardContent>
@@ -114,29 +168,44 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
 
           <Card>
             <CardContent className="p-4">
-              <p className="text-sm font-medium text-gray-500 mb-3">Your ratings</p>
+              <p className="text-sm font-medium text-gray-500 mb-3">Compare ratings</p>
               <div className="grid gap-2">
-                {categories.map((cat, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{cat.icon}</span>
-                      <span className="font-medium text-gray-700 text-sm">{cat.name}</span>
+                {categories.map((cat, i) => {
+                  const myR = ratings[i];
+                  const partnerR = partnerRatings[i];
+                  const diff = partnerR ? Math.abs(myR - partnerR) : null;
+                  return (
+                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{cat.icon}</span>
+                        <span className="font-medium text-gray-700 text-sm">{cat.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: 5 }, (_, s) => (
+                            <Star key={s} className={cn("h-3 w-3", s < myR ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200")} />
+                          ))}
+                          <span className="text-xs text-gray-500 ml-1">{myR}</span>
+                        </div>
+                        {partnerR ? (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: 5 }, (_, s) => (
+                              <Star key={s} className={cn("h-3 w-3", s < partnerR ? "fill-blue-400 text-blue-400" : "fill-gray-200 text-gray-200")} />
+                            ))}
+                            <span className="text-xs text-gray-500 ml-1">{partnerR}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">waiting...</span>
+                        )}
+                        {diff !== null && (
+                          <span className={cn("text-xs", diff === 0 ? "text-green-600" : "text-orange-500")}>
+                            {diff === 0 ? "Same!" : `±${diff}`}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 5 }, (_, s) => (
-                        <Star
-                          key={s}
-                          className={cn(
-                            "h-4 w-4",
-                            s < ratings[i]
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "fill-gray-200 text-gray-200"
-                          )}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -155,7 +224,7 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
   return (
     <GameLayout
       title="Rate Each Other"
-      subtitle={`${category.icon} ${category.name}`}
+      subtitle={`${category.icon} ${category.name} · ${connected ? "Connected" : "Connecting..."}`}
       onBack={onBack}
     >
       <div className="space-y-6">
@@ -168,7 +237,6 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
           </Badge>
         </div>
 
-        {/* Progress dots */}
         <div className="flex gap-1.5 justify-center">
           {categories.map((_, i) => (
             <div
@@ -196,6 +264,11 @@ export function RateEachOther({ onBack }: { onBack: () => void }) {
                 ? "Tap a star to rate"
                 : `${ratings[currentCategory]} out of 5 stars`}
             </p>
+            {partnerRatings[currentCategory] && (
+              <p className="text-sm text-blue-500 mt-2">
+                {partnerName || "Partner"} rated {partnerRatings[currentCategory]} stars
+              </p>
+            )}
           </CardContent>
         </Card>
 

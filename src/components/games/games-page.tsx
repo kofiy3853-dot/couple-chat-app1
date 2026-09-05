@@ -22,43 +22,38 @@ const games = [
     icon: Flame,
     bgLight: "bg-red-50",
     textColor: "text-red-600",
-    multiplayer: true,
   },
   {
     id: "couples-quiz" as const,
     name: "Couples Quiz",
-    description: "Test how well you know each other.",
+    description: "Test how well you know each other — live!",
     icon: HelpCircle,
     bgLight: "bg-blue-50",
     textColor: "text-blue-600",
-    multiplayer: false,
   },
   {
     id: "would-you-rather" as const,
     name: "Would You Rather",
-    description: "Pick between two fun scenarios.",
+    description: "Pick between two fun scenarios — see what your partner picks!",
     icon: GitBranch,
     bgLight: "bg-purple-50",
     textColor: "text-purple-600",
-    multiplayer: false,
   },
   {
     id: "rate-each-other" as const,
     name: "Rate Each Other",
-    description: "Rate different aspects of your relationship.",
+    description: "Rate your relationship — compare with your partner!",
     icon: Star,
     bgLight: "bg-yellow-50",
     textColor: "text-yellow-600",
-    multiplayer: false,
   },
   {
     id: "two-truths-lie" as const,
     name: "Two Truths & a Lie",
-    description: "Guess which statement is the lie!",
+    description: "Guess which statement is the lie — compete with your partner!",
     icon: Brain,
     bgLight: "bg-emerald-50",
     textColor: "text-emerald-600",
-    multiplayer: false,
   },
 ];
 
@@ -149,29 +144,23 @@ export function GamesPage() {
     );
   }
 
+  const socketActions = { startGame, makeChoice, sendQuestion, sendAnswer, endGame };
+
   if (activeGame) {
     const handleBack = () => setActiveGame(null);
+    const commonProps = { onBack: handleBack, conversationId, userId, connected, socketActions, onRegisterHandlers: updateHandler };
 
     switch (activeGame) {
       case "truth-or-dare":
-        return (
-          <TruthOrDare
-            onBack={handleBack}
-            conversationId={conversationId}
-            userId={userId}
-            connected={connected}
-            socketActions={{ startGame, makeChoice, sendQuestion, sendAnswer, endGame }}
-            onRegisterHandlers={updateHandler}
-          />
-        );
+        return <TruthOrDare {...commonProps} />;
       case "couples-quiz":
-        return <CouplesQuiz onBack={handleBack} />;
+        return <CouplesQuiz {...commonProps} />;
       case "would-you-rather":
-        return <WouldYouRather onBack={handleBack} />;
+        return <WouldYouRather {...commonProps} />;
       case "rate-each-other":
-        return <RateEachOther onBack={handleBack} />;
+        return <RateEachOther {...commonProps} />;
       case "two-truths-lie":
-        return <TwoTruthsLie onBack={handleBack} />;
+        return <TwoTruthsLie {...commonProps} />;
     }
   }
 
@@ -205,11 +194,9 @@ export function GamesPage() {
                 <h3 className="font-semibold text-gray-900">{game.name}</h3>
                 <p className="text-sm text-gray-500">{game.description}</p>
               </div>
-              {game.multiplayer && (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium shrink-0">
-                  Live
-                </span>
-              )}
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium shrink-0">
+                Live
+              </span>
               <div className="text-gray-400 shrink-0">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

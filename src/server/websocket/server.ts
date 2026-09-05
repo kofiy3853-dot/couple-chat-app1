@@ -509,32 +509,32 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
   });
 
   // ─── Game events ────────────────────────────────────────────────────────
-  socket.on("game-start", async (data: { conversationId: string; type: "truth" | "dare" }) => {
-    const { conversationId, type } = data;
-    if (!conversationId || !type) return;
+  socket.on("game-start", async (data: { conversationId: string; game: string; payload?: unknown }) => {
+    const { conversationId, game } = data;
+    if (!conversationId || !game) return;
 
     const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
-    io.to(`conversation:${conversationId}`).emit("game-challenge-received", { fromUserId: userId, fromUserName: userName, type });
+    io.to(`conversation:${conversationId}`).emit("game-challenge-received", { fromUserId: userId, fromUserName: userName, game, type: data.payload });
   });
 
-  socket.on("game-choice", async (data: { conversationId: string; type: "truth" | "dare" }) => {
-    const { conversationId, type } = data;
-    if (!conversationId || !type) return;
+  socket.on("game-choice", async (data: { conversationId: string; game: string; payload: unknown }) => {
+    const { conversationId, game, payload } = data;
+    if (!conversationId || !game) return;
 
     const gameLimit = await gameRateLimiter(`game:${userId}`);
     if (!gameLimit.allowed) return;
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
-    io.to(`conversation:${conversationId}`).emit("game-choice-made", { fromUserId: userId, fromUserName: userName, type });
+    io.to(`conversation:${conversationId}`).emit("game-choice-made", { fromUserId: userId, fromUserName: userName, game, payload });
   });
 
-  socket.on("game-question", async (data: { conversationId: string; question: string; type: "truth" | "dare" }) => {
-    const { conversationId, question, type } = data;
+  socket.on("game-question", async (data: { conversationId: string; game: string; question: string; payload?: unknown }) => {
+    const { conversationId, game, question } = data;
     if (!conversationId || !question) return;
 
     const gameLimit = await gameRateLimiter(`game:${userId}`);
@@ -542,11 +542,11 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
-    io.to(`conversation:${conversationId}`).emit("game-question-received", { fromUserId: userId, fromUserName: userName, question, type });
+    io.to(`conversation:${conversationId}`).emit("game-question-received", { fromUserId: userId, fromUserName: userName, game, question, type: data.payload });
   });
 
-  socket.on("game-answer", async (data: { conversationId: string; completed: boolean }) => {
-    const { conversationId, completed } = data;
+  socket.on("game-answer", async (data: { conversationId: string; game: string; completed: boolean; payload?: unknown }) => {
+    const { conversationId, completed, game } = data;
     if (!conversationId) return;
 
     const gameLimit = await gameRateLimiter(`game:${userId}`);
@@ -554,11 +554,11 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
-    io.to(`conversation:${conversationId}`).emit("game-answer-result", { fromUserId: userId, fromUserName: userName, completed });
+    io.to(`conversation:${conversationId}`).emit("game-answer-result", { fromUserId: userId, fromUserName: userName, game, completed, payload: data.payload });
   });
 
-  socket.on("game-end", async (data: { conversationId: string }) => {
-    const { conversationId } = data;
+  socket.on("game-end", async (data: { conversationId: string; game: string }) => {
+    const { conversationId, game } = data;
     if (!conversationId) return;
 
     const gameLimit = await gameRateLimiter(`game:${userId}`);
@@ -566,7 +566,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
 
     const { isMember } = await isConversationMember(userId, conversationId);
     if (!isMember) return;
-    io.to(`conversation:${conversationId}`).emit("game-ended", { fromUserId: userId });
+    io.to(`conversation:${conversationId}`).emit("game-ended", { fromUserId: userId, game });
   });
 
   // ─── Disconnect ─────────────────────────────────────────────────────────

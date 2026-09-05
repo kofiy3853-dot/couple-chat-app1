@@ -13,11 +13,11 @@ interface UseSocketOptions {
   onReactionAdded?: (data: { messageId: string; userId: string; userName?: string; emoji: string }) => void;
   onReactionRemoved?: (data: { messageId: string; userId: string; emoji: string }) => void;
   onNewNotification?: (notification: { id: string; type: string; title: string; message: string; link: string | null; read: boolean; createdAt: string }) => void;
-  onGameChallengeReceived?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
-  onGameChoiceMade?: (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => void;
-  onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => void;
-  onGameAnswerResult?: (data: { fromUserId: string; fromUserName: string; completed: boolean }) => void;
-  onGameEnded?: (data: { fromUserId: string }) => void;
+  onGameChallengeReceived?: (data: { fromUserId: string; fromUserName: string; game: string; type?: unknown }) => void;
+  onGameChoiceMade?: (data: { fromUserId: string; fromUserName: string; game: string; payload?: unknown }) => void;
+  onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; game: string; question: string; type?: unknown }) => void;
+  onGameAnswerResult?: (data: { fromUserId: string; fromUserName: string; game: string; completed: boolean; payload?: unknown }) => void;
+  onGameEnded?: (data: { fromUserId: string; game: string }) => void;
 }
 
 export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onNewNotification, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
@@ -155,23 +155,23 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onNewNotificationRef.current?.(data);
     });
 
-    const unsubGameChallenge = client.on("game-challenge-received", (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+    const unsubGameChallenge = client.on("game-challenge-received", (data: { fromUserId: string; fromUserName: string; game: string; type?: unknown }) => {
       onGameChallengeReceivedRef.current?.(data);
     });
 
-    const unsubGameChoice = client.on("game-choice-made", (data: { fromUserId: string; fromUserName: string; type: "truth" | "dare" }) => {
+    const unsubGameChoice = client.on("game-choice-made", (data: { fromUserId: string; fromUserName: string; game: string; payload?: unknown }) => {
       onGameChoiceMadeRef.current?.(data);
     });
 
-    const unsubGameQuestion = client.on("game-question-received", (data: { fromUserId: string; fromUserName: string; question: string; type: "truth" | "dare" }) => {
+    const unsubGameQuestion = client.on("game-question-received", (data: { fromUserId: string; fromUserName: string; game: string; question: string; type?: unknown }) => {
       onGameQuestionReceivedRef.current?.(data);
     });
 
-    const unsubGameAnswer = client.on("game-answer-result", (data: { fromUserId: string; fromUserName: string; completed: boolean }) => {
+    const unsubGameAnswer = client.on("game-answer-result", (data: { fromUserId: string; fromUserName: string; game: string; completed: boolean; payload?: unknown }) => {
       onGameAnswerResultRef.current?.(data);
     });
 
-    const unsubGameEnded = client.on("game-ended", (data: { fromUserId: string }) => {
+    const unsubGameEnded = client.on("game-ended", (data: { fromUserId: string; game: string }) => {
       onGameEndedRef.current?.(data);
     });
 
@@ -298,37 +298,37 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   );
 
   // ─── Game methods ──────────────────────────────────────────────────────
-  const startGame = useCallback(
-    (conversationId: string, type: "truth" | "dare") => {
-      clientRef.current?.startGame(conversationId, type);
+  const emitGameStart = useCallback(
+    (conversationId: string, game: string, payload?: unknown) => {
+      clientRef.current?.emitGameStart(conversationId, game, payload);
     },
     []
   );
 
-  const makeChoice = useCallback(
-    (conversationId: string, type: "truth" | "dare") => {
-      clientRef.current?.makeChoice(conversationId, type);
+  const emitGameChoice = useCallback(
+    (conversationId: string, game: string, payload: unknown) => {
+      clientRef.current?.emitGameChoice(conversationId, game, payload);
     },
     []
   );
 
-  const sendQuestion = useCallback(
-    (conversationId: string, question: string, type: "truth" | "dare") => {
-      clientRef.current?.sendQuestion(conversationId, question, type);
+  const emitGameQuestion = useCallback(
+    (conversationId: string, game: string, question: string, payload?: unknown) => {
+      clientRef.current?.emitGameQuestion(conversationId, game, question, payload);
     },
     []
   );
 
-  const sendAnswer = useCallback(
-    (conversationId: string, completed: boolean) => {
-      clientRef.current?.sendAnswer(conversationId, completed);
+  const emitGameAnswer = useCallback(
+    (conversationId: string, game: string, completed: boolean, payload?: unknown) => {
+      clientRef.current?.emitGameAnswer(conversationId, game, completed, payload);
     },
     []
   );
 
-  const endGame = useCallback(
-    (conversationId: string) => {
-      clientRef.current?.endGame(conversationId);
+  const emitGameEnd = useCallback(
+    (conversationId: string, game: string) => {
+      clientRef.current?.emitGameEnd(conversationId, game);
     },
     []
   );
@@ -349,10 +349,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     startCall,
     endCall,
     markAsRead,
-    startGame,
-    makeChoice,
-    sendQuestion,
-    sendAnswer,
-    endGame,
+    startGame: emitGameStart,
+    makeChoice: emitGameChoice,
+    sendQuestion: emitGameQuestion,
+    sendAnswer: emitGameAnswer,
+    endGame: emitGameEnd,
   };
 }
