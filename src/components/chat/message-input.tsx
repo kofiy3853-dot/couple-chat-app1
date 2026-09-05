@@ -208,10 +208,9 @@ export function MessageInput({
                   "focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500",
                   "max-h-20 overflow-y-auto"
                 )}
-                style={{ height: "36px" }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "36px";
+                  target.style.height = "auto";
                   target.style.height = Math.min(target.scrollHeight, 80) + "px";
                 }}
               />
