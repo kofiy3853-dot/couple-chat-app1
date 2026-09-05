@@ -3,9 +3,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { useChat, type Message } from "@/hooks/use-chat";
+import { useToast } from "@/hooks/use-toast";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
+import { ConnectionBanner } from "./connection-banner";
 import { EmptyChat } from "./empty-chat";
 
 interface ChatPageClientProps {
@@ -26,6 +28,7 @@ export function ChatPageClient({
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [wsSending, setWsSending] = useState(false);
+  const { toast } = useToast();
 
   const {
     messages,
@@ -168,6 +171,8 @@ export function ChatPageClient({
     const success = await editMessage(messageId, content);
     if (success) {
       broadcastMessageEdited(messageId, conversationId, content);
+    } else {
+      toast({ title: "Edit failed", description: "Could not edit message." });
     }
     return success;
   };
@@ -177,6 +182,8 @@ export function ChatPageClient({
     const success = await deleteMessage(messageId);
     if (success) {
       broadcastMessageDeleted(messageId, conversationId);
+    } else {
+      toast({ title: "Delete failed", description: "Could not delete message." });
     }
     return success;
   };
@@ -198,6 +205,8 @@ export function ChatPageClient({
         isPartnerTyping={isPartnerTyping}
         partnerPresence={partnerPresence}
       />
+
+      <ConnectionBanner connected={connected} reconnectFailed={reconnectFailed} />
 
       <MessageList
         messages={messages}
