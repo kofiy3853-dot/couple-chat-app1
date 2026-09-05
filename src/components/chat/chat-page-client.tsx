@@ -25,24 +25,6 @@ export function ChatPageClient({
 }: ChatPageClientProps) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
 
-  const handleNewMessage = useCallback(() => {}, []);
-
-  const {
-    connected,
-    typingState,
-    sendMessage: wsSendMessage,
-    startTyping,
-    stopTyping,
-    addReaction: wsAddReaction,
-    broadcastMessageDeleted,
-    broadcastMessageEdited,
-    broadcastReactionToggled,
-  } = useSocket({
-    conversationId,
-    userId,
-    onNewMessage: handleNewMessage,
-  });
-
   const {
     messages,
     loading,
@@ -50,7 +32,6 @@ export function ChatPageClient({
     hasMore,
     sending,
     loadMore,
-    sendMessage: httpSendMessage,
     deleteMessage,
     editMessage,
     addReaction,
@@ -62,30 +43,33 @@ export function ChatPageClient({
   } = useChat({
     conversationId,
     userId,
-    broadcasters: {
-      newMessage: (msg) => {
-        addRealtimeMessage(msg);
-      },
-      messageDeleted: (id) => {
-        markMessageDeleted(id);
-      },
-      messageEdited: (id, content) => {
-        markMessageEdited(id, content);
-      },
-      reactionToggled: (id, emoji, removed) => {
-        if (removed) {
-          applyReactionRemoved({ messageId: id, userId, emoji });
-        } else {
-          applyReactionAdded({ messageId: id, userId, emoji });
-        }
-      },
+  });
+
+  const handleNewMessage = useCallback(
+    (message: unknown) => {
+      addRealtimeMessage(message as Message);
     },
+    [addRealtimeMessage]
+  );
+
+  const {
+    connected,
+    typingState,
+    sendMessage: wsSendMessage,
+    startTyping,
+    stopTyping,
+    broadcastMessageDeleted,
+    broadcastMessageEdited,
+    broadcastReactionToggled,
+  } = useSocket({
+    conversationId,
+    userId,
+    onNewMessage: handleNewMessage,
   });
 
   const handleSend = async (content: string) => {
     if (!conversationId) return;
     wsSendMessage(conversationId, content, "TEXT", replyTo?.id);
-    await httpSendMessage(content, "TEXT", replyTo?.id);
     setReplyTo(null);
   };
 

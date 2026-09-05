@@ -324,7 +324,7 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
           replyToId: replyToId || undefined,
         },
         include: {
-          sender: { select: { id: true, name: true, image: true } },
+          sender: { select: { id: true, name: true, username: true, image: true } },
           reactions: true,
           attachments: true,
           replyTo: {
