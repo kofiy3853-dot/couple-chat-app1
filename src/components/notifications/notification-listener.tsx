@@ -6,6 +6,21 @@ import { useSocket } from "@/hooks/use-socket";
 import { useNotificationStore } from "@/stores/notification-store";
 import { playNotificationSound } from "@/lib/notification-sound";
 
+function updateAppBadge(count: number) {
+  // navigator.setAppBadge works on iOS PWA + Chrome
+  if ("setAppBadge" in navigator) {
+    try {
+      if (count > 0) {
+        navigator.setAppBadge(count);
+      } else {
+        navigator.clearAppBadge();
+      }
+    } catch {
+      // Not supported
+    }
+  }
+}
+
 async function showBrowserNotification(title: string, body: string, url: string) {
   // Try Service Worker notification first (works on mobile/PWA/iOS)
   if ("serviceWorker" in navigator) {
@@ -47,7 +62,13 @@ export function NotificationListener({ children }: { children: React.ReactNode }
   const userId = session?.user?.id || "";
   const addNotification = useNotificationStore((s) => s.addNotification);
   const incrementUnread = useNotificationStore((s) => s.incrementUnread);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
   const fetchDoneRef = useRef(false);
+
+  // Update app badge when unread count changes (iOS + Chrome)
+  useEffect(() => {
+    updateAppBadge(unreadCount);
+  }, [unreadCount]);
 
   // Request notification permission on mount
   useEffect(() => {
