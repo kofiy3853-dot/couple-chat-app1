@@ -100,6 +100,7 @@ self.addEventListener("push", (event) => {
       badge: "/icons/icon-72x72.svg",
       vibrate: [200, 100, 200],
       tag: data.tag || "couple-notification",
+      data: { url: data.url || "/" },
     })
   );
 });
