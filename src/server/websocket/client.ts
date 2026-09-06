@@ -98,6 +98,7 @@ class WebSocketClient {
       "user-online",
       "user-offline",
       "presence-snapshot",
+      "new-notification",
       "game-challenge-received",
       "game-choice-made",
       "game-question-received",
