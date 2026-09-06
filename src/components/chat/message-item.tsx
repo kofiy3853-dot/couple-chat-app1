@@ -200,7 +200,7 @@ export function MessageItem({
                   />
                 )}
                 {message.type === "AUDIO" && message.content && (
-                  <audio controls src={message.content} className="w-full h-8" />
+                  <audio controls src={message.content} className="w-full h-11 min-h-[44px] rounded-lg" />
                 )}
                 {message.type === "TEXT" && (
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
