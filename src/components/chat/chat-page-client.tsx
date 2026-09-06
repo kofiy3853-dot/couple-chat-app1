@@ -158,6 +158,31 @@ export function ChatPageClient({
     }
   };
 
+  const handleVoiceRecording = async (blob: Blob, _mimeType: string) => {
+    if (!conversationId) return;
+    setUploadError(null);
+    setWsSending(true);
+    try {
+      const ext = _mimeType.includes("mp4") ? "m4a" : _mimeType.includes("ogg") ? "ogg" : "webm";
+      const file = new File([blob], `voice.${ext}`, { type: _mimeType });
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.success) {
+        wsSendMessage(conversationId, data.data.url, "AUDIO");
+      } else {
+        setUploadError(data.error?.message || "Voice upload failed");
+        setTimeout(() => setUploadError(null), 3000);
+      }
+    } catch {
+      setUploadError("Voice upload failed. Check your connection.");
+      setTimeout(() => setUploadError(null), 3000);
+    } finally {
+      setWsSending(false);
+    }
+  };
+
   const handleReact = async (messageId: string, emoji: string) => {
     if (!conversationId) return;
     const result = await addReaction(messageId, emoji);
@@ -229,6 +254,7 @@ export function ChatPageClient({
 
       <MessageInput
         onSend={handleSend}
+        onVoiceRecording={handleVoiceRecording}
         onAttachment={handleAttachment}
         onTypingStart={() => conversationId && startTyping(conversationId)}
         onTypingStop={() => conversationId && stopTyping(conversationId)}

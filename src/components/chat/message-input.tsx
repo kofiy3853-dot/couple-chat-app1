@@ -1,16 +1,39 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, Smile, Mic, X, Paperclip } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Mic, X, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDuration } from "@/hooks/use-voice-recorder";
+
+const MAX_RECORDING_SECONDS = 300; // 5 minutes
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function getSupportedMimeType(): string {
+  const types = [
+    "audio/mp4",
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/wav",
+  ];
+  for (const type of types) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return "";
+}
 
 interface MessageInputProps {
   onSend: (content: string) => void;
+  onVoiceRecording?: (blob: Blob, mimeType: string) => void;
   onTypingStart: () => void;
   onTypingStop: () => void;
-  onVoiceRecording?: (blob: Blob) => void;
   onAttachment?: (file: File) => void;
   replyTo?: { id: string; content: string; senderName: string } | null;
   onCancelReply?: () => void;
@@ -19,9 +42,9 @@ interface MessageInputProps {
 
 export function MessageInput({
   onSend,
+  onVoiceRecording,
   onTypingStart,
   onTypingStop,
-  onVoiceRecording,
   onAttachment,
   replyTo,
   onCancelReply,
@@ -35,12 +58,21 @@ export function MessageInput({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  // Cleanup on unmount — stop any active recording
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
@@ -74,15 +106,31 @@ export function MessageInput({
     }
   };
 
+  const cleanupRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+  }, []);
+
   const startRecording = async () => {
+    const mimeType = getSupportedMimeType();
+    if (!mimeType) {
+      alert("Audio recording is not supported on this browser.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "audio/webm",
-      });
+      streamRef.current = stream;
 
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -92,8 +140,10 @@ export function MessageInput({
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
-        onVoiceRecording?.(blob);
+        onVoiceRecording?.(blob, mediaRecorder.mimeType);
         stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        chunksRef.current = [];
       };
 
       mediaRecorder.start();
@@ -101,31 +151,38 @@ export function MessageInput({
       setRecordingDuration(0);
 
       recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration((p) => p + 1);
+        setRecordingDuration((p) => {
+          const next = p + 1;
+          if (next >= MAX_RECORDING_SECONDS) {
+            stopRecording();
+          }
+          return next;
+        });
       }, 1000);
     } catch {
-      // Microphone access denied
+      alert("Microphone access denied. Please allow microphone access in your browser settings.");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
   };
 
   const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingDuration(0);
-      chunksRef.current = [];
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
     }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    cleanupRecording();
   };
 
   return (
