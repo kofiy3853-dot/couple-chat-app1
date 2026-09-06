@@ -97,7 +97,6 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icons/icon-192x192.svg",
-      badge: "/icons/icon-72x72.svg",
       vibrate: [200, 100, 200],
       tag: data.tag || "couple-notification",
       data: { url: data.url || "/" },

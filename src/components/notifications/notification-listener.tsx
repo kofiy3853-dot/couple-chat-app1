@@ -14,7 +14,6 @@ async function showBrowserNotification(title: string, body: string, url: string)
       await reg.showNotification(title, {
         body,
         icon: "/icons/icon-192x192.svg",
-        badge: "/icons/icon-72x72.svg",
         tag: "couple-chat",
         data: { url: url || "/notifications" },
       });
