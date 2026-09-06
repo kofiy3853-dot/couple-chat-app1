@@ -192,27 +192,15 @@ export function MessageItem({
               </div>
             ) : (
               <>
-                {message.type === "IMAGE" && (
-                  message.attachments?.[0] ? (
-                    <img
-                      src={message.attachments[0].url}
-                      alt={message.attachments[0].filename}
-                      className="rounded-lg max-w-full mb-1"
-                    />
-                  ) : message.content.startsWith("data:image") ? (
-                    <img
-                      src={message.content}
-                      alt="Shared image"
-                      className="rounded-lg max-w-full mb-1"
-                    />
-                  ) : null
+                {message.type === "IMAGE" && message.content && (
+                  <img
+                    src={message.content}
+                    alt="Shared image"
+                    className="rounded-lg max-w-full mb-1"
+                  />
                 )}
-                {message.type === "AUDIO" && (
-                  message.attachments?.[0] ? (
-                    <audio controls src={message.attachments[0].url} className="w-full h-8" />
-                  ) : message.content.startsWith("data:audio") ? (
-                    <audio controls src={message.content} className="w-full h-8" />
-                  ) : null
+                {message.type === "AUDIO" && message.content && (
+                  <audio controls src={message.content} className="w-full h-8" />
                 )}
                 {message.type === "TEXT" && (
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
