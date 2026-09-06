@@ -1,12 +1,47 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { MoreHorizontal, SmilePlus, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, SmilePlus, Pencil, Trash2, Play, Pause } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, formatRelativeTime, formatFullTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ReactionPicker } from "./reaction-picker";
 import type { Message } from "@/hooks/use-chat";
+
+function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
+    const onEnd = () => { setPlaying(false); setProgress(0); };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("ended", onEnd);
+    return () => { audio.removeEventListener("timeupdate", onTime); audio.removeEventListener("ended", onEnd); };
+  }, []);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) { audio.pause(); } else { audio.play(); }
+    setPlaying(!playing);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
+      <button onClick={toggle} className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", isOwn ? "bg-white/20 hover:bg-white/30" : "bg-rose-100 dark:bg-rose-900/30 hover:bg-rose-200 dark:hover:bg-rose-900/50")}>
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+      </button>
+      <div className={cn("flex-1 h-1.5 rounded-full overflow-hidden", isOwn ? "bg-white/20" : "bg-gray-200 dark:bg-gray-700")}>
+        <div className={cn("h-full rounded-full transition-all", isOwn ? "bg-white" : "bg-rose-500")} style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
+}
 
 interface MessageItemProps {
   message: Message;
@@ -200,7 +235,7 @@ export function MessageItem({
                   />
                 )}
                 {message.type === "AUDIO" && message.content && (
-                  <audio controls src={message.content} className="w-full h-11 min-h-[44px] rounded-lg" />
+                  <AudioPlayer src={message.content} isOwn={isOwn} />
                 )}
                 {message.type === "TEXT" && (
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
