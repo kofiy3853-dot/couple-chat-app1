@@ -16,7 +16,6 @@ function showBrowserNotification(title: string, body: string, url: string) {
       icon: "/icons/icon-192x192.svg",
       badge: "/icons/icon-72x72.svg",
       tag: "couple-chat",
-      renotify: true,
     });
     n.onclick = () => {
       window.focus();
