@@ -59,7 +59,7 @@ export function Header({ user }: HeaderProps) {
     .slice(0, 2) || "U";
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 sm:px-6 lg:px-8 py-4">
+    <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 sm:px-6 lg:px-8 py-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)]">
       <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 lg:hidden">
         {getTitle()}
       </h1>
