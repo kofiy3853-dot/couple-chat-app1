@@ -6,24 +6,40 @@ import { useSocket } from "@/hooks/use-socket";
 import { useNotificationStore } from "@/stores/notification-store";
 import { playNotificationSound } from "@/lib/notification-sound";
 
-function showBrowserNotification(title: string, body: string, url: string) {
-  if (typeof Notification === "undefined") return;
-  if (Notification.permission !== "granted") return;
+async function showBrowserNotification(title: string, body: string, url: string) {
+  // Try Service Worker notification first (works on mobile/PWA/iOS)
+  if ("serviceWorker" in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title, {
+        body,
+        icon: "/icons/icon-192x192.svg",
+        badge: "/icons/icon-72x72.svg",
+        tag: "couple-chat",
+        data: { url: url || "/notifications" },
+      });
+      return;
+    } catch {
+      // SW notification failed, fall through
+    }
+  }
 
-  try {
-    const n = new Notification(title, {
-      body,
-      icon: "/icons/icon-192x192.svg",
-      badge: "/icons/icon-72x72.svg",
-      tag: "couple-chat",
-    });
-    n.onclick = () => {
-      window.focus();
-      if (url) window.location.href = url;
-      n.close();
-    };
-  } catch {
-    // Notification API not available (e.g. iOS Safari)
+  // Fallback to basic Notification API (desktop only)
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      const n = new Notification(title, {
+        body,
+        icon: "/icons/icon-192x192.svg",
+        tag: "couple-chat",
+      });
+      n.onclick = () => {
+        window.focus();
+        if (url) window.location.href = url;
+        n.close();
+      };
+    } catch {
+      // Not available
+    }
   }
 }
 
@@ -33,17 +49,12 @@ export function NotificationListener({ children }: { children: React.ReactNode }
   const addNotification = useNotificationStore((s) => s.addNotification);
   const incrementUnread = useNotificationStore((s) => s.incrementUnread);
   const fetchDoneRef = useRef(false);
-  const notifPermissionRef = useRef<NotificationPermission>("default");
 
-  // Request browser notification permission once
+  // Request notification permission on mount
   useEffect(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission === "default") {
-      Notification.requestPermission().then((perm) => {
-        notifPermissionRef.current = perm;
-      });
-    } else {
-      notifPermissionRef.current = Notification.permission;
+      Notification.requestPermission();
     }
   }, []);
 
@@ -55,7 +66,7 @@ export function NotificationListener({ children }: { children: React.ReactNode }
     // Play sound
     playNotificationSound();
 
-    // Show browser popup if page is not focused
+    // Show browser popup if page is not focused or hidden
     if (document.hidden || !document.hasFocus()) {
       showBrowserNotification(n.title, n.message, n.link || "/notifications");
     }
