@@ -60,7 +60,7 @@ export function VideoCallModal({
   onToggleAudio,
   onEndCall,
 }: VideoCallModalProps) {
-  const hasVideoTrack = localStream?.getVideoTracks().length ?? 0 > 0;
+  const hasVideoTrack = (localStream?.getVideoTracks().length ?? 0) > 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">

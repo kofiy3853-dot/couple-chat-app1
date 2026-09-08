@@ -67,8 +67,8 @@ export default async function ChatPage() {
       userImage={currentUser.image}
       conversationId={conversationId}
       partnerName={partnerName}
-      partnerImage={partnerImage}
-      partnerUserId={partnerUserId}
+      partnerImage={partnerImage ?? undefined}
+      partnerUserId={partnerUserId ?? undefined}
     />
   );
 }
