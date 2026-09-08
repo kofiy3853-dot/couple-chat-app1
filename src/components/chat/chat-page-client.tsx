@@ -17,7 +17,7 @@ import type { CallState } from "@/types/video-call";
 
 interface ChatPageClientProps {
   userId: string;
-  userName?: string;
+  userName?: string | null;
   userImage?: string | null;
   conversationId: string | null;
   partnerName: string | null;
