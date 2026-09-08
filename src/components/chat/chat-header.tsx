@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, WifiOff, RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 import { TypingIndicator } from "./typing-indicator";
+import { CallButton } from "./call-button";
 import type { PresenceStatus } from "@/lib/constants";
 
 interface ChatHeaderProps {
@@ -14,6 +15,8 @@ interface ChatHeaderProps {
   reconnectFailed: boolean;
   isPartnerTyping: boolean;
   partnerPresence: PresenceStatus;
+  onCall?: () => void;
+  callDisabled?: boolean;
 }
 
 function getPresenceText(presence: PresenceStatus): string {
@@ -33,6 +36,8 @@ export function ChatHeader({
   reconnectFailed,
   isPartnerTyping,
   partnerPresence,
+  onCall,
+  callDisabled,
 }: ChatHeaderProps) {
   return (
     <header className="flex items-center gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
@@ -84,6 +89,10 @@ export function ChatHeader({
           </div>
         )}
       </div>
+
+      {onCall && (
+        <CallButton onClick={onCall} disabled={callDisabled} />
+      )}
     </header>
   );
 }

@@ -3,15 +3,22 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { useChat, type Message } from "@/hooks/use-chat";
+import { useIncomingCall } from "@/hooks/use-incoming-call";
 import { useToast } from "@/hooks/use-toast";
+import { rtcConfig, videoConstraints } from "@/lib/webrtc";
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
 import { ConnectionBanner } from "./connection-banner";
 import { EmptyChat } from "./empty-chat";
+import { VideoCallModal } from "./video-call-modal";
+import { IncomingCallDialog } from "./incoming-call-dialog";
+import type { CallState } from "@/types/video-call";
 
 interface ChatPageClientProps {
   userId: string;
+  userName?: string;
+  userImage?: string | null;
   conversationId: string | null;
   partnerName: string | null;
   partnerImage: string | null;
@@ -20,6 +27,8 @@ interface ChatPageClientProps {
 
 export function ChatPageClient({
   userId,
+  userName,
+  userImage,
   conversationId,
   partnerName,
   partnerImage,
@@ -30,6 +39,280 @@ export function ChatPageClient({
   const [wsSending, setWsSending] = useState(false);
   const { toast } = useToast();
 
+  // ─── Video call state ────────────────────────────────────────────────────
+  const [callState, setCallState] = useState<CallState>({
+    status: "idle",
+    conversationId: null,
+    partnerUserId: null,
+    partnerName: null,
+    partnerImage: null,
+    startedAt: null,
+  });
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [callDuration, setCallDuration] = useState(0);
+
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callStartTimeRef = useRef<number | null>(null);
+  const iceCandidateBufferRef = useRef<RTCIceCandidateInit[]>([]);
+
+  // Refs for stable callback access
+  const onCallEndedRef = useRef<(() => void) | null>(null);
+  const sendCallOfferRef = useRef<(conversationId: string, offer: RTCSessionDescriptionInit, callerName: string, callerImage: string | null) => void>(() => {});
+  const sendCallAnswerRef = useRef<(conversationId: string, answer: RTCSessionDescriptionInit) => void>(() => {});
+  const sendIceCandidateRef = useRef<(conversationId: string, candidate: RTCIceCandidateInit) => void>(() => {});
+  const rejectCallRef = useRef<(conversationId: string) => void>(() => {});
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
+      if (peerConnectionRef.current) peerConnectionRef.current.close();
+    };
+  }, []);
+
+  const cleanupCall = useCallback(() => {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    setLocalStream(null);
+    setRemoteStream(null);
+    setCallDuration(0);
+    iceCandidateBufferRef.current = [];
+    callStartTimeRef.current = null;
+  }, []);
+
+  const startCallTimer = useCallback(() => {
+    callStartTimeRef.current = Date.now();
+    callTimerRef.current = setInterval(() => {
+      if (callStartTimeRef.current) {
+        setCallDuration(Math.floor((Date.now() - callStartTimeRef.current) / 1000));
+      }
+    }, 1000);
+  }, []);
+
+  const stopCallTimer = useCallback(() => {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+  }, []);
+
+  const endVideoCall = useCallback(() => {
+    stopCallTimer();
+    cleanupCall();
+    setCallState({
+      status: "idle",
+      conversationId: null,
+      partnerUserId: null,
+      partnerName: null,
+      partnerImage: null,
+      startedAt: null,
+    });
+    onCallEndedRef.current?.();
+  }, [stopCallTimer, cleanupCall]);
+
+  const endVideoCallRef = useRef(endVideoCall);
+  useEffect(() => { endVideoCallRef.current = endVideoCall; }, [endVideoCall]);
+
+  const createPeerConnection = useCallback(
+    (targetConversationId: string, onIceCandidate: (candidate: RTCIceCandidateInit) => void) => {
+      const pc = new RTCPeerConnection(rtcConfig);
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          onIceCandidate(event.candidate.toJSON());
+        }
+      };
+
+      pc.ontrack = (event) => {
+        const stream = event.streams[0];
+        if (stream) {
+          setRemoteStream(stream);
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed") {
+          endVideoCallRef.current();
+        }
+      };
+
+      peerConnectionRef.current = pc;
+      return pc;
+    },
+    []
+  );
+
+  const getLocalMedia = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+    localStreamRef.current = stream;
+    setLocalStream(stream);
+    return stream;
+  }, []);
+
+  const initiateVideoCall = useCallback(
+    async (targetConversationId: string, partnerUserId: string, partnerName: string, partnerImage: string | null) => {
+      try {
+        setCallState({
+          status: "outgoing",
+          conversationId: targetConversationId,
+          partnerUserId,
+          partnerName,
+          partnerImage,
+          startedAt: null,
+        });
+
+        const stream = await getLocalMedia();
+        const pc = createPeerConnection(targetConversationId, (candidate) => {
+          sendIceCandidateRef.current(targetConversationId, candidate);
+        });
+
+        stream.getTracks().forEach((track) => {
+          pc.addTrack(track, stream);
+        });
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        sendCallOfferRef.current(targetConversationId, offer, userName || "You", userImage ?? null);
+      } catch (err) {
+        console.error("[VideoCall] Failed to initiate call:", err);
+        cleanupCall();
+        setCallState((prev) => ({ ...prev, status: "idle" }));
+      }
+    },
+    [getLocalMedia, createPeerConnection, userName, userImage, cleanupCall]
+  );
+
+  const acceptVideoCall = useCallback(
+    async (
+      targetConversationId: string,
+      offer: RTCSessionDescriptionInit,
+      callerId: string,
+      callerName: string,
+      callerImage: string | null
+    ) => {
+      try {
+        setCallState({
+          status: "connecting",
+          conversationId: targetConversationId,
+          partnerUserId: callerId,
+          partnerName: callerName,
+          partnerImage: callerImage,
+          startedAt: null,
+        });
+
+        const stream = await getLocalMedia();
+        const pc = createPeerConnection(targetConversationId, (candidate) => {
+          sendIceCandidateRef.current(targetConversationId, candidate);
+        });
+
+        stream.getTracks().forEach((track) => {
+          pc.addTrack(track, stream);
+        });
+
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+        for (const candidate of iceCandidateBufferRef.current) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        iceCandidateBufferRef.current = [];
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        sendCallAnswerRef.current(targetConversationId, answer);
+      } catch (err) {
+        console.error("[VideoCall] Failed to accept call:", err);
+        cleanupCall();
+        setCallState((prev) => ({ ...prev, status: "idle" }));
+      }
+    },
+    [getLocalMedia, createPeerConnection, cleanupCall]
+  );
+
+  const handleCallAnswer = useCallback(
+    async (answer: RTCSessionDescriptionInit) => {
+      const pc = peerConnectionRef.current;
+      if (!pc) return;
+
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        setCallState((prev) => ({ ...prev, status: "active", startedAt: Date.now() }));
+        startCallTimer();
+      } catch (err) {
+        console.error("[VideoCall] Failed to handle answer:", err);
+        endVideoCallRef.current();
+      }
+    },
+    [startCallTimer]
+  );
+
+  const handleIceCandidate = useCallback(async (candidate: RTCIceCandidateInit) => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.remoteDescription) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error("[VideoCall] Failed to add ICE candidate:", err);
+      }
+    } else {
+      iceCandidateBufferRef.current.push(candidate);
+    }
+  }, []);
+
+  const toggleVideo = useCallback(() => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoEnabled(videoTrack.enabled);
+      }
+    }
+  }, []);
+
+  const toggleAudio = useCallback(() => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudioEnabled(audioTrack.enabled);
+      }
+    }
+  }, []);
+
+  // ─── Incoming call hook ──────────────────────────────────────────────────
+  const incomingCall = useIncomingCall({
+    onAccept: useCallback(
+      (call) => {
+        acceptVideoCall(call.conversationId, call.offer, call.callerId, call.callerName, call.callerImage);
+      },
+      [acceptVideoCall]
+    ),
+    onReject: useCallback(
+      (cId) => {
+        rejectCallRef.current(cId);
+      },
+      []
+    ),
+  });
+
+  // ─── Chat messages ──────────────────────────────────────────────────────
   const {
     messages,
     loading,
@@ -43,7 +326,6 @@ export function ChatPageClient({
     applyReactionAdded,
     applyReactionRemoved,
     applyMessagesRead,
-    applyMessageDelivered,
   } = useChat({
     conversationId,
     userId,
@@ -94,6 +376,12 @@ export function ChatPageClient({
     broadcastReactionToggled,
     markAsRead,
     markDelivered,
+    startCall: startCallSocket,
+    endCall: endCallSocket,
+    sendCallOffer,
+    sendCallAnswer,
+    sendIceCandidate,
+    rejectCall,
   } = useSocket({
     conversationId,
     userId,
@@ -101,7 +389,27 @@ export function ChatPageClient({
     onReactionAdded: handleReactionAdded,
     onReactionRemoved: handleReactionRemoved,
     onMessagesRead: handleMessagesRead,
+    onCallOffer: useCallback((data: { conversationId: string; callerId: string; callerName: string; callerImage: string | null; offer: RTCSessionDescriptionInit }) => {
+      incomingCall.handleIncomingOffer(data);
+    }, [incomingCall.handleIncomingOffer]),
+    onCallAnswer: useCallback((data: { conversationId: string; answer: RTCSessionDescriptionInit }) => {
+      handleCallAnswer(data.answer);
+    }, [handleCallAnswer]),
+    onCallIceCandidate: useCallback((data: { conversationId: string; candidate: RTCIceCandidateInit }) => {
+      handleIceCandidate(data.candidate);
+    }, [handleIceCandidate]),
   });
+
+  // Wire up onCallEnded for the endVideoCall
+  useEffect(() => {
+    onCallEndedRef.current = () => {
+      if (conversationId) endCallSocket(conversationId);
+    };
+    sendCallOfferRef.current = sendCallOffer;
+    sendCallAnswerRef.current = sendCallAnswer;
+    sendIceCandidateRef.current = sendIceCandidate;
+    rejectCallRef.current = rejectCall;
+  }, [conversationId, endCallSocket, sendCallOffer, sendCallAnswer, sendIceCandidate, rejectCall]);
 
   // Mark messages as read when partner opens chat
   const lastReadRef = useRef<string | null>(null);
@@ -213,12 +521,38 @@ export function ChatPageClient({
     return success;
   };
 
+  // ─── Call handlers ────────────────────────────────────────────────────────
+  const handleStartCall = useCallback(async () => {
+    if (!conversationId || !partnerUserId || !partnerName) return;
+
+    const partnerPresenceState = presenceState[partnerUserId] ?? "offline";
+    if (partnerPresenceState === "in-call") {
+      toast({ title: "Partner busy", description: "Your partner is already in a call." });
+      return;
+    }
+    if (partnerPresenceState === "offline") {
+      toast({ title: "Partner offline", description: "Your partner is not online." });
+      return;
+    }
+
+    startCallSocket(conversationId);
+    await initiateVideoCall(conversationId, partnerUserId, partnerName, partnerImage);
+  }, [conversationId, partnerUserId, partnerName, partnerImage, presenceState, startCallSocket, initiateVideoCall, toast]);
+
+  const handleEndCall = useCallback(() => {
+    if (callState.conversationId) {
+      endCallSocket(callState.conversationId);
+    }
+    endVideoCall();
+  }, [callState.conversationId, endCallSocket, endVideoCall]);
+
   if (!conversationId) {
     return <EmptyChat />;
   }
 
   const isPartnerTyping = partnerUserId ? (typingState[partnerUserId] ?? false) : false;
   const partnerPresence = partnerUserId ? (presenceState[partnerUserId] ?? "offline") : "offline";
+  const isCallActive = callState.status !== "idle";
 
   return (
     <div className="flex flex-col h-dvh sm:h-full bg-white dark:bg-gray-950">
@@ -229,6 +563,8 @@ export function ChatPageClient({
         reconnectFailed={reconnectFailed}
         isPartnerTyping={isPartnerTyping}
         partnerPresence={partnerPresence}
+        onCall={handleStartCall}
+        callDisabled={!connected || isCallActive || partnerPresence === "offline" || partnerPresence === "in-call"}
       />
 
       <ConnectionBanner connected={connected} reconnectFailed={reconnectFailed} />
@@ -262,6 +598,33 @@ export function ChatPageClient({
         onCancelReply={() => setReplyTo(null)}
         sending={wsSending}
       />
+
+      {/* Video call modal */}
+      {isCallActive && callState.conversationId && (
+        <VideoCallModal
+          status={callState.status}
+          localStream={localStream}
+          remoteStream={remoteStream}
+          isVideoEnabled={isVideoEnabled}
+          isAudioEnabled={isAudioEnabled}
+          callDuration={callDuration}
+          partnerName={callState.partnerName}
+          partnerImage={callState.partnerImage}
+          onToggleVideo={toggleVideo}
+          onToggleAudio={toggleAudio}
+          onEndCall={handleEndCall}
+        />
+      )}
+
+      {/* Incoming call dialog */}
+      {incomingCall.incomingCall && (
+        <IncomingCallDialog
+          callerName={incomingCall.incomingCall.callerName}
+          callerImage={incomingCall.incomingCall.callerImage}
+          onAccept={incomingCall.accept}
+          onReject={incomingCall.reject}
+        />
+      )}
     </div>
   );
 }

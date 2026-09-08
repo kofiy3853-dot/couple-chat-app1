@@ -455,6 +455,46 @@ io.on("connection", async (socket: AuthenticatedSocket) => {
     socket.to(`conversation:${data.conversationId}`).emit("call-end", { userId, conversationId: data.conversationId });
   });
 
+  socket.on("call-offer", async (data: { conversationId: string; offer: RTCSessionDescriptionInit; callerName: string; callerImage: string | null }) => {
+    if (!data.conversationId || !data.offer) return;
+    const { isMember } = await isConversationMember(userId, data.conversationId);
+    if (!isMember) return;
+    socket.to(`conversation:${data.conversationId}`).emit("call-offer", {
+      conversationId: data.conversationId,
+      callerId: userId,
+      callerName: data.callerName,
+      callerImage: data.callerImage,
+      offer: data.offer,
+    });
+  });
+
+  socket.on("call-answer", async (data: { conversationId: string; answer: RTCSessionDescriptionInit }) => {
+    if (!data.conversationId || !data.answer) return;
+    const { isMember } = await isConversationMember(userId, data.conversationId);
+    if (!isMember) return;
+    socket.to(`conversation:${data.conversationId}`).emit("call-answer", {
+      conversationId: data.conversationId,
+      answer: data.answer,
+    });
+  });
+
+  socket.on("call-ice-candidate", async (data: { conversationId: string; candidate: RTCIceCandidateInit }) => {
+    if (!data.conversationId || !data.candidate) return;
+    const { isMember } = await isConversationMember(userId, data.conversationId);
+    if (!isMember) return;
+    socket.to(`conversation:${data.conversationId}`).emit("call-ice-candidate", {
+      conversationId: data.conversationId,
+      candidate: data.candidate,
+    });
+  });
+
+  socket.on("call-reject", async (data: { conversationId: string }) => {
+    if (!data.conversationId) return;
+    const { isMember } = await isConversationMember(userId, data.conversationId);
+    if (!isMember) return;
+    socket.to(`conversation:${data.conversationId}`).emit("call-reject", { conversationId: data.conversationId, userId });
+  });
+
   // ─── Reactions ──────────────────────────────────────────────────────────
   socket.on("reaction-added", async (data: { messageId: string; conversationId: string; emoji: string }) => {
     const { messageId, conversationId, emoji } = data;

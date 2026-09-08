@@ -19,9 +19,13 @@ interface UseSocketOptions {
   onGameQuestionReceived?: (data: { fromUserId: string; fromUserName: string; game: string; question: string; type?: unknown }) => void;
   onGameAnswerResult?: (data: { fromUserId: string; fromUserName: string; game: string; completed: boolean; payload?: unknown }) => void;
   onGameEnded?: (data: { fromUserId: string; game: string }) => void;
+  onCallOffer?: (data: { conversationId: string; callerId: string; callerName: string; callerImage: string | null; offer: RTCSessionDescriptionInit }) => void;
+  onCallAnswer?: (data: { conversationId: string; answer: RTCSessionDescriptionInit }) => void;
+  onCallIceCandidate?: (data: { conversationId: string; candidate: RTCIceCandidateInit }) => void;
+  onCallReject?: (data: { conversationId: string; userId: string }) => void;
 }
 
-export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onNewNotification, onMessagesRead, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded }: UseSocketOptions) {
+export function useSocket({ conversationId, userId, onNewMessage, onMessageDeleted, onMessageEdited, onReactionAdded, onReactionRemoved, onNewNotification, onMessagesRead, onGameChallengeReceived, onGameChoiceMade, onGameQuestionReceived, onGameAnswerResult, onGameEnded, onCallOffer, onCallAnswer, onCallIceCandidate, onCallReject }: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
   const [reconnectFailed, setReconnectFailed] = useState(false);
   const [typingState, setTypingState] = useState<Record<string, boolean>>({});
@@ -41,6 +45,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   const onGameQuestionReceivedRef = useRef(onGameQuestionReceived);
   const onGameAnswerResultRef = useRef(onGameAnswerResult);
   const onGameEndedRef = useRef(onGameEnded);
+  const onCallOfferRef = useRef(onCallOffer);
+  const onCallAnswerRef = useRef(onCallAnswer);
+  const onCallIceCandidateRef = useRef(onCallIceCandidate);
+  const onCallRejectRef = useRef(onCallReject);
 
   useEffect(() => { onNewMessageRef.current = onNewMessage; }, [onNewMessage]);
   useEffect(() => { onMessageDeletedRef.current = onMessageDeleted; }, [onMessageDeleted]);
@@ -54,6 +62,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
   useEffect(() => { onGameQuestionReceivedRef.current = onGameQuestionReceived; }, [onGameQuestionReceived]);
   useEffect(() => { onGameAnswerResultRef.current = onGameAnswerResult; }, [onGameAnswerResult]);
   useEffect(() => { onGameEndedRef.current = onGameEnded; }, [onGameEnded]);
+  useEffect(() => { onCallOfferRef.current = onCallOffer; }, [onCallOffer]);
+  useEffect(() => { onCallAnswerRef.current = onCallAnswer; }, [onCallAnswer]);
+  useEffect(() => { onCallIceCandidateRef.current = onCallIceCandidate; }, [onCallIceCandidate]);
+  useEffect(() => { onCallRejectRef.current = onCallReject; }, [onCallReject]);
 
   useEffect(() => {
     conversationIdRef.current = conversationId;
@@ -182,6 +194,22 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       onGameEndedRef.current?.(data);
     });
 
+    const unsubCallOffer = client.on("call-offer", (data: { conversationId: string; callerId: string; callerName: string; callerImage: string | null; offer: RTCSessionDescriptionInit }) => {
+      onCallOfferRef.current?.(data);
+    });
+
+    const unsubCallAnswer = client.on("call-answer", (data: { conversationId: string; answer: RTCSessionDescriptionInit }) => {
+      onCallAnswerRef.current?.(data);
+    });
+
+    const unsubCallIceCandidate = client.on("call-ice-candidate", (data: { conversationId: string; candidate: RTCIceCandidateInit }) => {
+      onCallIceCandidateRef.current?.(data);
+    });
+
+    const unsubCallReject = client.on("call-reject", (data: { conversationId: string; userId: string }) => {
+      onCallRejectRef.current?.(data);
+    });
+
     client.connect();
 
     return () => {
@@ -209,6 +237,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
       unsubGameQuestion();
       unsubGameAnswer();
       unsubGameEnded();
+      unsubCallOffer();
+      unsubCallAnswer();
+      unsubCallIceCandidate();
+      unsubCallReject();
       Object.values(typingTimers.current).forEach(clearTimeout);
 
       if (conversationIdRef.current) {
@@ -298,6 +330,34 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     []
   );
 
+  const sendCallOffer = useCallback(
+    (conversationId: string, offer: RTCSessionDescriptionInit, callerName: string, callerImage: string | null) => {
+      clientRef.current?.sendCallOffer({ conversationId, offer, callerName, callerImage });
+    },
+    []
+  );
+
+  const sendCallAnswer = useCallback(
+    (conversationId: string, answer: RTCSessionDescriptionInit) => {
+      clientRef.current?.sendCallAnswer({ conversationId, answer });
+    },
+    []
+  );
+
+  const sendIceCandidate = useCallback(
+    (conversationId: string, candidate: RTCIceCandidateInit) => {
+      clientRef.current?.sendIceCandidate({ conversationId, candidate });
+    },
+    []
+  );
+
+  const rejectCall = useCallback(
+    (conversationId: string) => {
+      clientRef.current?.rejectCall(conversationId);
+    },
+    []
+  );
+
   const markAsRead = useCallback(
     (conversationId: string, lastReadMessageId: string) => {
       clientRef.current?.markAsRead(conversationId, lastReadMessageId);
@@ -363,6 +423,10 @@ export function useSocket({ conversationId, userId, onNewMessage, onMessageDelet
     stopRecording,
     startCall,
     endCall,
+    sendCallOffer,
+    sendCallAnswer,
+    sendIceCandidate,
+    rejectCall,
     markAsRead,
     markDelivered,
     startGame: emitGameStart,

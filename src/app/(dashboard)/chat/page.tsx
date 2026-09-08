@@ -12,7 +12,7 @@ export default async function ChatPage() {
 
   const currentUser = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true },
+    select: { id: true, name: true, image: true },
   });
 
   if (!currentUser) {
@@ -63,6 +63,8 @@ export default async function ChatPage() {
   return (
     <ChatPageClient
       userId={currentUser.id}
+      userName={currentUser.name}
+      userImage={currentUser.image}
       conversationId={conversationId}
       partnerName={partnerName}
       partnerImage={partnerImage}

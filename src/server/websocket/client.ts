@@ -91,6 +91,10 @@ class WebSocketClient {
       "recording-stop",
       "call-start",
       "call-end",
+      "call-offer",
+      "call-answer",
+      "call-ice-candidate",
+      "call-reject",
       "reaction-added",
       "reaction-removed",
       "message-deleted",
@@ -183,6 +187,22 @@ class WebSocketClient {
 
   endCall(conversationId: string): void {
     this.socket?.emit("call-end", { conversationId });
+  }
+
+  sendCallOffer(data: { conversationId: string; offer: RTCSessionDescriptionInit; callerName: string; callerImage: string | null }): void {
+    this.socket?.emit("call-offer", data);
+  }
+
+  sendCallAnswer(data: { conversationId: string; answer: RTCSessionDescriptionInit }): void {
+    this.socket?.emit("call-answer", data);
+  }
+
+  sendIceCandidate(data: { conversationId: string; candidate: RTCIceCandidateInit }): void {
+    this.socket?.emit("call-ice-candidate", data);
+  }
+
+  rejectCall(conversationId: string): void {
+    this.socket?.emit("call-reject", { conversationId });
   }
 
   addReaction(messageId: string, conversationId: string, emoji: string): void {
